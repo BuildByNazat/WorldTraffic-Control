@@ -1,0 +1,50 @@
+WorldTraffic Control - How to Install Node.js
+=============================================
+
+The frontend (Vite + React) requires Node.js to run.
+The backend (FastAPI + Python) does NOT need Node.js.
+
+STEP 1 - Download Node.js LTS
+------------------------------
+Go to: https://nodejs.org
+Click the "LTS" (Long Term Support) button.
+Download and run the .msi installer.
+Accept all defaults. The installer adds Node to your PATH automatically.
+
+STEP 2 - Reopen PowerShell
+---------------------------
+IMPORTANT: You must close your current PowerShell window and open a new one
+after installing Node. The PATH change only takes effect in new windows.
+
+STEP 3 - Verify the install
+----------------------------
+In a new PowerShell window, run:
+
+    node -v
+    npm -v
+
+Expected output (versions may differ):
+    v22.x.x
+    10.x.x
+
+STEP 4 - Run setup again
+-------------------------
+Once Node is confirmed working, run:
+
+    .\scripts\setup.ps1
+
+This will now install the frontend packages as well.
+
+STEP 5 - Start the project
+---------------------------
+    .\scripts\dev.ps1
+
+Troubleshooting
+---------------
+- If 'node' is not recognized after install:
+    Restart your computer, then try again.
+- If npm install fails:
+    Make sure you are in the project folder, not in backend\ or frontend\.
+    The script handles the folder change automatically.
+- For further help, run the environment doctor:
+    .\scripts\doctor.ps1
