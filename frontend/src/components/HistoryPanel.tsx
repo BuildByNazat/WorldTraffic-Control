@@ -1,12 +1,5 @@
 /**
  * HistoryPanel - right-side sliding panel for historical data.
- *
- * Tabs:
- *   Summary - aggregated statistics from /api/history/summary
- *   Detections - scrollable list of recent Gemini camera detections
- *   Aircraft - scrollable list of recent aircraft observations
- *
- * Clicking a detection or aircraft item updates replay selection and detail state.
  */
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -32,8 +25,8 @@ interface HistoryPanelProps {
 
 function formatTime(iso: string | null): string {
   if (!iso) return "-";
-  const d = new Date(iso);
-  return d.toLocaleString(undefined, {
+  const date = new Date(iso);
+  return date.toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -43,8 +36,8 @@ function formatTime(iso: string | null): string {
   });
 }
 
-function confidencePct(c: number): string {
-  return `${(c * 100).toFixed(0)}%`;
+function confidencePct(value: number): string {
+  return `${(value * 100).toFixed(0)}%`;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -56,8 +49,8 @@ const CATEGORY_COLORS: Record<string, string> = {
   unknown: "#9ca3af",
 };
 
-function categoryColor(cat: string): string {
-  return CATEGORY_COLORS[cat] ?? CATEGORY_COLORS.unknown;
+function categoryColor(category: string): string {
+  return CATEGORY_COLORS[category] ?? CATEGORY_COLORS.unknown;
 }
 
 function buildDetectionDetail(
@@ -122,7 +115,7 @@ function SummaryTab({
 }) {
   if (loading) return <div className="history-empty">Loading summary...</div>;
   if (error) return <div className="history-error">{error}</div>;
-  if (!summary) return <div className="history-empty">No data yet.</div>;
+  if (!summary) return <div className="history-empty">No history is available yet.</div>;
 
   const categories = Object.entries(summary.detections_by_category).sort(
     (a, b) => b[1] - a[1]
@@ -135,19 +128,19 @@ function SummaryTab({
           <span className="history-stat__value">
             {summary.total_aircraft_observations.toLocaleString()}
           </span>
-          <span className="history-stat__label">Aircraft Observed</span>
+          <span className="history-stat__label">Aircraft observations</span>
         </div>
         <div className="history-stat">
           <span className="history-stat__value">
             {summary.total_detections.toLocaleString()}
           </span>
-          <span className="history-stat__label">Detections Logged</span>
+          <span className="history-stat__label">Detections logged</span>
         </div>
       </div>
 
       {hasActiveFilters && (
         <div className="history-summary__note">
-          Summary reflects the current backend filter state.
+          Summary reflects the active history filters.
         </div>
       )}
 
@@ -155,14 +148,14 @@ function SummaryTab({
         <>
           <div className="history-section-label">By Category</div>
           <div className="history-category-list">
-            {categories.map(([cat, count]) => (
-              <div key={cat} className="history-category-row">
+            {categories.map(([category, count]) => (
+              <div key={category} className="history-category-row">
                 <span
                   className="history-category-dot"
-                  style={{ background: categoryColor(cat) }}
+                  style={{ background: categoryColor(category) }}
                   aria-hidden="true"
                 />
-                <span className="history-category-name">{cat}</span>
+                <span className="history-category-name">{category}</span>
                 <span className="history-category-count">{count}</span>
               </div>
             ))}
@@ -235,12 +228,12 @@ function DetectionsTab({
       <div className="history-empty">
         {hasActiveFilters
           ? "No detections match the current filters."
-          : "No detections logged yet."}
+          : "No detections are available yet."}
         <br />
         <span className="history-empty__hint">
           {hasActiveFilters
-            ? "Try widening the time window or resetting the filters."
-            : "Detections appear when Gemini analyses a camera image."}
+            ? "Try widening the time range or clearing a filter."
+            : "Detections appear when the camera analysis pipeline records a result."}
         </span>
       </div>
     );
@@ -267,7 +260,7 @@ function DetectionsTab({
             <div className="history-item__body">
               <span className="history-item__title">{detection.label}</span>
               <span className="history-item__meta">
-                {detection.category} · {confidencePct(detection.confidence)} ·{" "}
+                {detection.category} / {confidencePct(detection.confidence)} /{" "}
                 {formatTime(detection.detected_at)}
               </span>
             </div>
@@ -298,19 +291,19 @@ function AircraftTab({
   selectedReplayKey: string | null;
   hasActiveFilters: boolean;
 }) {
-  if (feed.loading) return <div className="history-empty">Loading aircraft logs...</div>;
+  if (feed.loading) return <div className="history-empty">Loading aircraft...</div>;
   if (feed.error) return <div className="history-error">{feed.error}</div>;
   if (feed.aircraft.length === 0) {
     return (
       <div className="history-empty">
         {hasActiveFilters
           ? "No aircraft records match the current filters."
-          : "No aircraft observations logged yet."}
+          : "No aircraft observations are available yet."}
         <br />
         <span className="history-empty__hint">
           {hasActiveFilters
-            ? "Try clearing the source, callsign, altitude, or time filters."
-            : "Aircraft are logged whenever a live feed snapshot is broadcast."}
+            ? "Try widening the time range or clearing a filter."
+            : "Aircraft observations appear when the live feed records a position."}
         </span>
       </div>
     );
@@ -329,8 +322,8 @@ function AircraftTab({
             onClick={() => onSelectEvent(detail)}
             aria-pressed={isSelected}
           >
-            <span className="history-item__icon" aria-hidden="true">
-              *
+            <span className="history-item__badge" aria-hidden="true">
+              AC
             </span>
             <div className="history-item__body">
               <span className="history-item__title">{detail.label}</span>
@@ -338,7 +331,7 @@ function AircraftTab({
                 {record.altitude != null
                   ? `${record.altitude.toLocaleString()} ft`
                   : "-"}{" "}
-                · {record.source} · {formatTime(record.observed_at)}
+                / {record.source} / {formatTime(record.observed_at)}
               </span>
             </div>
           </button>
@@ -451,7 +444,10 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
   return (
     <div className="history-panel" role="complementary" aria-label="History panel">
       <div className="history-panel__header">
-        <span className="history-panel__title">History</span>
+        <div className="history-panel__heading">
+          <span className="history-panel__title">History</span>
+          <span className="history-panel__subtitle">Filtered timeline review</span>
+        </div>
         <button
           className="history-panel__refresh"
           onClick={feed.refresh}
@@ -459,7 +455,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
           title="Refresh history data"
           aria-label="Refresh history"
         >
-          {feed.loading ? "..." : "R"}
+          {feed.loading ? "Syncing" : "Sync"}
         </button>
       </div>
 

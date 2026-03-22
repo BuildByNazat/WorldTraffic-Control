@@ -80,7 +80,15 @@ body {
 }
 
 .app-header .logo {
-  font-size: 1.4rem;
+  min-width: 40px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(88, 166, 255, 0.12);
+  color: var(--color-accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
 }
 
 .app-content {
@@ -160,6 +168,10 @@ body {
   transition: transform 0.3s ease;
 }
 
+.aircraft-icon span {
+  display: block;
+}
+
 /* ── Status panel ─────────────────────────────────────────── */
 .status-panel {
   position: absolute;
@@ -216,11 +228,28 @@ body {
   border-bottom: 1px solid var(--color-border);
 }
 
+.layer-controls__heading,
+.alerts-panel__heading,
+.incidents-panel__heading,
+.history-panel__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .layer-controls__title {
   font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+}
+
+.layer-controls__subtitle,
+.alerts-panel__subtitle,
+.incidents-panel__subtitle,
+.history-panel__subtitle {
+  font-size: 0.72rem;
   color: var(--color-text-muted);
 }
 
@@ -282,7 +311,7 @@ body {
   background: transparent;
   color: var(--color-text-muted);
   border-radius: 6px;
-  padding: 4px 8px;
+  padding: 6px 10px;
   font-size: 0.72rem;
   cursor: pointer;
 }
@@ -291,6 +320,11 @@ body {
   padding: 14px;
   font-size: 0.78rem;
   color: var(--color-text-muted);
+}
+
+.incidents-panel__state--error,
+.alerts-panel__state--error {
+  color: var(--color-danger);
 }
 
 .incidents-list {
@@ -342,6 +376,11 @@ body {
   color: var(--color-text-muted);
 }
 
+.incident-card__status {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .incident-card__editor {
   display: flex;
   flex-direction: column;
@@ -379,6 +418,16 @@ body {
   cursor: pointer;
 }
 
+.incident-card__save:hover,
+.event-detail__action:hover,
+.alerts-panel__refresh:hover,
+.incidents-panel__refresh:hover,
+.history-panel__refresh:hover,
+.alert-card__action:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
 .alerts-panel--compact {
   width: 260px;
   max-height: min(460px, calc(100% - 32px));
@@ -406,9 +455,16 @@ body {
   background: transparent;
   color: var(--color-text-muted);
   border-radius: 6px;
-  padding: 4px 8px;
+  padding: 6px 10px;
   font-size: 0.72rem;
   cursor: pointer;
+}
+
+.alerts-panel__footer {
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
 }
 
 .alerts-toast {
@@ -476,8 +532,7 @@ body {
   color: var(--color-text-muted);
 }
 
-.alerts-panel__error,
-.alerts-panel__empty {
+.alerts-panel__state {
   padding: 14px;
   font-size: 0.78rem;
   color: var(--color-text-muted);
@@ -562,6 +617,13 @@ body {
   padding: 0 12px 12px;
 }
 
+.alert-card__action--primary,
+.event-detail__action--primary {
+  background: rgba(88, 166, 255, 0.1);
+  border-color: rgba(88, 166, 255, 0.3);
+  color: var(--color-text);
+}
+
 .event-detail {
   position: absolute;
   left: 16px;
@@ -617,10 +679,9 @@ body {
   background: transparent;
   color: var(--color-text-muted);
   border-radius: 6px;
-  width: 28px;
-  height: 28px;
-  font-size: 1rem;
-  line-height: 1;
+  padding: 6px 10px;
+  font-size: 0.74rem;
+  line-height: 1.2;
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -894,9 +955,8 @@ body {
   border: 1px solid var(--color-border);
   border-radius: 4px;
   color: var(--color-text-muted);
-  font-size: 1rem;
-  width: 28px;
-  height: 28px;
+  font-size: 0.72rem;
+  padding: 6px 10px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1342,6 +1402,20 @@ body {
   flex-shrink: 0;
   margin-top: 1px;
   color: var(--color-accent);
+}
+
+.history-item__badge {
+  min-width: 24px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(88, 166, 255, 0.12);
+  color: var(--color-accent);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-align: center;
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .history-item__body {

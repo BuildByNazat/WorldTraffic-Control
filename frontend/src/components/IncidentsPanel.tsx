@@ -39,21 +39,31 @@ const IncidentsPanel: React.FC<IncidentsPanelProps> = ({
   return (
     <aside className="incidents-panel" aria-label="Incidents panel">
       <div className="incidents-panel__header">
-        <span className="incidents-panel__title">Incidents</span>
+        <div className="incidents-panel__heading">
+          <span className="incidents-panel__title">Incidents</span>
+          <span className="incidents-panel__subtitle">Review queue</span>
+        </div>
         <button
           type="button"
           className="incidents-panel__refresh"
           onClick={refresh}
           disabled={loading}
         >
-          {loading ? "..." : "R"}
+          {loading ? "Syncing" : "Sync"}
         </button>
       </div>
 
-      {error && <div className="incidents-panel__state">{error}</div>}
+      {loading && incidents.length === 0 && (
+        <div className="incidents-panel__state">Loading incidents...</div>
+      )}
+      {error && (
+        <div className="incidents-panel__state incidents-panel__state--error">
+          {error}
+        </div>
+      )}
       {!loading && incidents.length === 0 && (
         <div className="incidents-panel__state">
-          No promoted incidents yet.
+          No incidents have been promoted yet.
         </div>
       )}
 
@@ -75,7 +85,7 @@ const IncidentsPanel: React.FC<IncidentsPanelProps> = ({
                   <span className="incident-card__status">{incident.status}</span>
                 </div>
                 <div className="incident-card__meta">
-                  {incident.category} · {incident.severity} ·{" "}
+                  {incident.category} / {incident.severity} /{" "}
                   {formatTime(incident.created_at)}
                 </div>
               </button>

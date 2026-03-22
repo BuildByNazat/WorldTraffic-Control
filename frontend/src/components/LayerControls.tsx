@@ -30,7 +30,10 @@ const LayerControls: React.FC<LayerControlsProps> = ({
   return (
     <aside className="layer-controls" aria-label="Map layer controls">
       <div className="layer-controls__header">
-        <span className="layer-controls__title">Map Layers</span>
+        <div className="layer-controls__heading">
+          <span className="layer-controls__title">Layers</span>
+          <span className="layer-controls__subtitle">Map visibility</span>
+        </div>
       </div>
 
       <div className="layer-controls__body">
@@ -55,7 +58,7 @@ const LayerControls: React.FC<LayerControlsProps> = ({
           onChange={() => onToggleLayer("showReplayHighlight")}
         />
         <ToggleRow
-          label="Selected event"
+          label="Selected detail"
           checked={layers.showSelectedHighlight}
           onChange={() => onToggleLayer("showSelectedHighlight")}
         />

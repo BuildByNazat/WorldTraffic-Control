@@ -35,16 +35,21 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
       aria-label="Alerts panel"
     >
       <div className="alerts-panel__header">
-        <span className="alerts-panel__title">
-          {variant === "compact" ? "Live Alerts" : "Alerts"}
-        </span>
+        <div className="alerts-panel__heading">
+          <span className="alerts-panel__title">
+            {variant === "compact" ? "Live Alerts" : "Alerts"}
+          </span>
+          {variant === "compact" && (
+            <span className="alerts-panel__subtitle">Current alert activity</span>
+          )}
+        </div>
         <button
           type="button"
           className="alerts-panel__refresh"
           onClick={alertsState.refresh}
           disabled={loading}
         >
-          {loading ? "…" : "↻"}
+          {loading ? "Syncing" : "Sync"}
         </button>
       </div>
 
@@ -66,7 +71,7 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
         <div className="alerts-summary">
           <div className="alerts-summary__stat">
             <span className="alerts-summary__value">{summary.total_open_alerts}</span>
-            <span className="alerts-summary__label">Open</span>
+            <span className="alerts-summary__label">Open alerts</span>
           </div>
           <div className="alerts-summary__group">
             {Object.entries(summary.alerts_by_severity).map(([severity, count]) => (
@@ -87,13 +92,16 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
         </div>
       )}
 
-      {error && <div className="alerts-panel__error">{error}</div>}
+      {loading && alerts.length === 0 && (
+        <div className="alerts-panel__state">Loading alerts...</div>
+      )}
+      {error && <div className="alerts-panel__state alerts-panel__state--error">{error}</div>}
 
       {!loading && alerts.length === 0 && (
-        <div className="alerts-panel__empty">
+        <div className="alerts-panel__state">
           {variant === "compact"
-            ? "No open live alerts."
-            : "No active alerts derived from recent detections."}
+            ? "No open alerts in the current live view."
+            : "No active alerts are available for review."}
         </div>
       )}
 
@@ -117,10 +125,10 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
                 </span>
               </div>
               <div className="alert-card__meta">
-                {alert.category} · {alert.severity} · {formatTime(alert.timestamp)}
+                {alert.category} / {alert.severity} / {formatTime(alert.timestamp)}
               </div>
               <div className="alert-card__meta">
-                {alert.camera_id ?? "Unknown camera"} · {alert.source}
+                {alert.camera_id ?? "Camera unavailable"} / {alert.source}
               </div>
             </button>
 
@@ -132,11 +140,11 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
                   onClick={() => void acknowledge(alert.id)}
                   disabled={alert.status !== "new"}
                 >
-                  Ack
+                  Acknowledge
                 </button>
                 <button
                   type="button"
-                  className="alert-card__action"
+                  className="alert-card__action alert-card__action--primary"
                   onClick={() => void resolve(alert.id)}
                   disabled={alert.status === "resolved"}
                 >
@@ -147,6 +155,12 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
           </div>
         ))}
       </div>
+
+      {variant === "compact" && alerts.length > visibleAlerts.length && (
+        <div className="alerts-panel__footer">
+          Showing {visibleAlerts.length} of {alerts.length} alerts
+        </div>
+      )}
     </aside>
   );
 };

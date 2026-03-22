@@ -30,7 +30,7 @@ L.Icon.Default.mergeOptions({
 function createAircraftIcon(heading: number): L.DivIcon {
   return L.divIcon({
     className: "",
-    html: `<div class="aircraft-icon" style="transform: rotate(${heading}deg)">*</div>`,
+    html: `<div class="aircraft-icon" style="transform: rotate(${heading}deg)"><span>&#9992;</span></div>`,
     iconSize: [24, 24],
     iconAnchor: [12, 12],
     popupAnchor: [0, -14],
@@ -110,7 +110,7 @@ function buildDetectionPopup(feature: AnyFeature): string {
         <tr><td>Category</td><td>${properties.category}</td></tr>
         <tr><td>Confidence</td><td>${confidence}%</td></tr>
         <tr><td>Camera</td><td>${properties.camera_id}</td></tr>
-        <tr><td>Detected</td><td>${time}</td></tr>
+        <tr><td>Observed</td><td>${time}</td></tr>
       </table>
       <p class="detection-popup__note">Position is approximate to the camera location.</p>
     </div>
@@ -280,7 +280,7 @@ function HighlightLayer({ location, variant, enabled }: HighlightLayerProps) {
     if (!location || !variant || !enabled) return;
 
     const color = variant === "replay" ? "#38bdf8" : "#facc15";
-    const subtitle = variant === "replay" ? "Replay selection" : "Selected event";
+    const subtitle = variant === "replay" ? "Replay selection" : "Selected item";
 
     const circle = L.circleMarker([location.lat, location.lon], {
       radius: variant === "replay" ? 13 : 14,

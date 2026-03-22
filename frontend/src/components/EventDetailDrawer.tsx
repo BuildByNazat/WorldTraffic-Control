@@ -60,7 +60,7 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
               ? "Alert Detail"
               : selectedEvent.kind === "incident"
                 ? "Incident Detail"
-                : "Event Detail"}
+                : "Selection Detail"}
           </span>
           <span className="event-detail__title">{selectedEvent.label}</span>
         </div>
@@ -70,7 +70,7 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
           onClick={onClose}
           aria-label="Close event details"
         >
-          x
+          Close
         </button>
       </div>
 
@@ -80,7 +80,7 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
             <DetailRow label="Category" value={selectedEvent.category} />
             <DetailRow label="Severity" value={selectedEvent.severity} />
             <DetailRow label="Status" value={selectedEvent.status} />
-            <DetailRow label="Timestamp" value={formatTime(selectedEvent.timestamp)} />
+            <DetailRow label="Observed" value={formatTime(selectedEvent.timestamp)} />
             <DetailRow label="Source" value={selectedEvent.source} />
             <DetailRow
               label="Camera"
@@ -98,6 +98,10 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
                   : "Not available"
               }
             />
+            <DetailRow
+              label="Incident"
+              value={linkedIncident ? linkedIncident.id : "Not created"}
+            />
             <div className="event-detail__actions">
               {linkedIncident ? (
                 <button
@@ -110,7 +114,7 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
               ) : (
                 <button
                   type="button"
-                  className="event-detail__action"
+                  className="event-detail__action event-detail__action--primary"
                   onClick={onCreateIncidentFromAlert}
                 >
                   Create incident
@@ -128,7 +132,7 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
                 selectedEvent.eventType === "detection" ? "Detection" : "Aircraft"
               }
             />
-            <DetailRow label="Timestamp" value={formatTime(selectedEvent.timestamp)} />
+            <DetailRow label="Observed" value={formatTime(selectedEvent.timestamp)} />
             <DetailRow label="Source" value={selectedEvent.source} />
             <DetailRow
               label="Location"
@@ -193,12 +197,12 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
             <DetailRow label="Category" value={selectedEvent.category} />
             <DetailRow label="Severity" value={selectedEvent.severity} />
             <DetailRow label="Status" value={selectedEvent.status} />
-            <DetailRow label="Timestamp" value={formatTime(selectedEvent.timestamp)} />
+            <DetailRow label="Updated" value={formatTime(selectedEvent.timestamp)} />
+            <DetailRow label="Source alert" value={selectedEvent.sourceAlertId} />
             <DetailRow
-              label="Source alert"
-              value={selectedEvent.sourceAlertId}
+              label="Camera"
+              value={selectedEvent.cameraId ?? "Not available"}
             />
-            <DetailRow label="Camera" value={selectedEvent.cameraId ?? "Not available"} />
             <DetailRow
               label="Location"
               value={`${formatCoordinate(selectedEvent.latitude)}, ${formatCoordinate(selectedEvent.longitude)}`}
@@ -213,7 +217,7 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
             />
             <DetailRow
               label="Notes"
-              value={selectedEvent.operatorNotes || "No notes yet"}
+              value={selectedEvent.operatorNotes || "No notes entered"}
             />
           </>
         )}

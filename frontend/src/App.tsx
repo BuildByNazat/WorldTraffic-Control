@@ -32,6 +32,17 @@ import type {
   SelectedIncidentDetail,
 } from "./types/selectedEvent";
 
+function isSameSelection(
+  current: SelectedEventDetail | null,
+  next: SelectedEventDetail
+): boolean {
+  if (!current || current.kind !== next.kind) return false;
+  if (current.kind === "history" && next.kind === "history") {
+    return current.eventKey === next.eventKey;
+  }
+  return current.id === next.id;
+}
+
 const App: React.FC = () => {
   const { data, status, lastUpdate } = useLiveFeed();
   const [mode, setMode] = useState<AppMode>("live");
@@ -49,6 +60,7 @@ const App: React.FC = () => {
   const aircraftCount = data?.features.filter(isAircraftFeature).length ?? 0;
   const detectionCount =
     data?.features.filter((feature) => !isAircraftFeature(feature)).length ?? 0;
+
   const linkedIncident = useMemo(() => {
     if (selectedEvent?.kind === "alert") {
       return incidentsState.getIncidentByAlertId(selectedEvent.id);
@@ -75,12 +87,21 @@ const App: React.FC = () => {
     ) {
       return;
     }
-    handleSelectIncident(nextIncident);
+    selectIncident(nextIncident, false);
   }, [incidentsState.incidents, selectedEvent]);
 
   function clearSelection() {
     setSelectedEvent(null);
     setHighlight(null);
+  }
+
+  function applySelection(event: SelectedEventDetail) {
+    setSelectedEvent(event);
+    setHighlight({
+      lat: event.latitude,
+      lon: event.longitude,
+      label: event.label,
+    });
   }
 
   function handleModeChange(next: AppMode) {
@@ -96,15 +117,10 @@ const App: React.FC = () => {
       return;
     }
 
-    setSelectedEvent(event);
-    setHighlight({
-      lat: event.latitude,
-      lon: event.longitude,
-      label: event.label,
-    });
+    applySelection(event);
   }
 
-  function handleSelectAlert(alert: AlertRecord) {
+  function selectAlert(alert: AlertRecord, allowToggle = true) {
     const detail: SelectedAlertDetail = {
       kind: "alert",
       id: alert.id,
@@ -120,10 +136,15 @@ const App: React.FC = () => {
       featureIds: alert.feature_ids,
     };
 
-    handleSelectEvent(detail);
+    if (allowToggle && isSameSelection(selectedEvent, detail)) {
+      clearSelection();
+      return;
+    }
+
+    applySelection(detail);
   }
 
-  function handleSelectIncident(incident: IncidentRecord) {
+  function selectIncident(incident: IncidentRecord, allowToggle = true) {
     const detail: SelectedIncidentDetail = {
       kind: "incident",
       id: incident.id,
@@ -141,7 +162,12 @@ const App: React.FC = () => {
       operatorNotes: incident.operator_notes,
     };
 
-    handleSelectEvent(detail);
+    if (allowToggle && isSameSelection(selectedEvent, detail)) {
+      clearSelection();
+      return;
+    }
+
+    applySelection(detail);
   }
 
   async function handleCreateIncidentFromSelectedAlert() {
@@ -151,7 +177,7 @@ const App: React.FC = () => {
 
     const incident = await incidentsState.createFromAlert(alert);
     if (incident) {
-      handleSelectIncident(incident);
+      selectIncident(incident, false);
     }
   }
 
@@ -159,7 +185,7 @@ const App: React.FC = () => {
     <div className="app-shell">
       <header className="app-header">
         <span className="logo" aria-hidden="true">
-          World
+          WTC
         </span>
         <h1>WorldTraffic Control</h1>
         <div className="app-header__spacer" />
@@ -180,7 +206,7 @@ const App: React.FC = () => {
                 : null
           }
           selectedAlertId={selectedEvent?.kind === "alert" ? selectedEvent.id : null}
-          onSelectAlert={handleSelectAlert}
+          onSelectAlert={selectAlert}
         />
 
         <StatusPanel
@@ -197,7 +223,7 @@ const App: React.FC = () => {
 
         <AlertsPanel
           alertsState={alertsState}
-          onSelectAlert={handleSelectAlert}
+          onSelectAlert={selectAlert}
           variant={mode === "live" ? "compact" : "full"}
           selectedAlertId={selectedEvent?.kind === "alert" ? selectedEvent.id : null}
         />
@@ -211,7 +237,7 @@ const App: React.FC = () => {
           }}
           onOpenLinkedIncident={() => {
             if (linkedIncident) {
-              handleSelectIncident(linkedIncident);
+              selectIncident(linkedIncident, false);
             }
           }}
         />
@@ -222,7 +248,7 @@ const App: React.FC = () => {
             selectedIncidentId={
               selectedEvent?.kind === "incident" ? selectedEvent.id : null
             }
-            onSelectIncident={handleSelectIncident}
+            onSelectIncident={selectIncident}
           />
         )}
 
