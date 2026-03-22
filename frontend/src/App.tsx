@@ -16,10 +16,12 @@ import StatusPanel from "./components/StatusPanel";
 import ModeToggle from "./components/ModeToggle";
 import type { AppMode } from "./components/ModeToggle";
 import HistoryPanel from "./components/HistoryPanel";
+import AlertsPanel from "./components/AlertsPanel";
 import type { SelectedLocation } from "./components/HistoryPanel";
 import { useLiveFeed, isAircraftFeature } from "./hooks/useLiveFeed";
 import { useFilteredHistory } from "./hooks/useFilteredHistory";
 import { useHistoryFeed } from "./hooks/useHistoryFeed";
+import { useAlerts, type AlertRecord } from "./hooks/useAlerts";
 
 const App: React.FC = () => {
   const { data, status, lastUpdate } = useLiveFeed();
@@ -29,6 +31,7 @@ const App: React.FC = () => {
 
   const historyFilters = useFilteredHistory();
   const historyFeed = useHistoryFeed(mode === "history", historyFilters.filters);
+  const alertsState = useAlerts(mode === "history");
 
   const aircraftCount = data?.features.filter(isAircraftFeature).length ?? 0;
   const detectionCount =
@@ -50,6 +53,11 @@ const App: React.FC = () => {
       setSelectedId(loc.featureId);
       setHighlight({ lat: loc.lat, lon: loc.lon, label: loc.label });
     }
+  }
+
+  function handleSelectAlert(alert: AlertRecord) {
+    setSelectedId(alert.feature_ids[0] ?? alert.id);
+    setHighlight({ lat: alert.latitude, lon: alert.longitude, label: alert.title });
   }
 
   return (
@@ -74,12 +82,15 @@ const App: React.FC = () => {
         />
 
         {mode === "history" && (
-          <HistoryPanel
-            feed={historyFeed}
-            filters={historyFilters}
-            onSelectLocation={handleSelectLocation}
-            selectedFeatureId={selectedId}
-          />
+          <>
+            <AlertsPanel alertsState={alertsState} onSelectAlert={handleSelectAlert} />
+            <HistoryPanel
+              feed={historyFeed}
+              filters={historyFilters}
+              onSelectLocation={handleSelectLocation}
+              selectedFeatureId={selectedId}
+            />
+          </>
         )}
       </main>
     </div>

@@ -1,26 +1,5 @@
 """
-WorldTraffic Control - FastAPI application entry point. v0.4.0
-
-Lifecycle:
-  startup  -> init_db (create tables) -> start broadcast + camera background tasks
-  shutdown -> cancel both tasks -> close DB pool -> close provider connections
-
-Endpoints:
-  GET /              - health check
-  GET /api/status    - provider / intervals / connection count / Gemini + DB state
-  GET /api/snapshot  - combined snapshot (aircraft + detections)
-  GET /api/cameras   - camera metadata list
-  WS  /ws/live       - live combined broadcast stream
-
-History endpoints (Phase 4 - SQLite):
-  GET /api/history/aircraft   - recent aircraft observations
-  GET /api/history/detections - recent Gemini camera detections
-  GET /api/history/cameras    - recent camera snapshot cycles
-  GET /api/history/summary    - aggregated statistics
-
-History API notes:
-  - Logging failures will never crash or stall the live feed.
-  - DB writes are fire-and-forget asyncio.create_task() calls.
+WorldTraffic Control API entry point.
 """
 
 import asyncio
@@ -29,13 +8,16 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
-from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.db import close_db, init_db
 from app.schemas import (
     AircraftHistoryResponse,
+    AlertStatusResponse,
+    AlertsResponse,
+    AlertsSummary,
     CameraList,
     CameraSnapshotHistoryResponse,
     CombinedFeatureCollection,
@@ -43,6 +25,7 @@ from app.schemas import (
     HistorySummary,
     ServiceStatus,
 )
+from app.services.alerts import derive_alert_records, get_alerts_summary
 from app.services.broadcaster import broadcast_loop, build_combined_snapshot, manager
 from app.services.camera_registry import get_all_cameras
 from app.services.cameras import camera_fetch_loop
@@ -58,10 +41,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: init DB, launch background tasks. Shutdown: cancel + cleanup."""
     logger.info(
-        "Starting WorldTraffic Control v0.4.0 | Provider: %s | "
-        "Broadcast: %.1fs | Camera: %.0fs | Gemini: %s | DB: %s",
+        "Starting WorldTraffic Control v0.4.0 | Provider: %s | Broadcast: %.1fs | Camera: %.0fs | Gemini: %s | DB: %s",
         settings.aircraft_provider,
         settings.broadcast_interval,
         settings.camera_fetch_interval,
@@ -88,10 +69,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="WorldTraffic Control API",
-    description=(
-        "Real-time geospatial tracking - aircraft via WebSocket + "
-        "Gemini camera analysis (Phase 3) + SQLite history (Phase 4)."
-    ),
+    description="Real-time geospatial tracking with history and alerts.",
     version="0.4.0",
     lifespan=lifespan,
 )
@@ -129,34 +107,23 @@ async def service_status():
 
 @app.get("/api/snapshot", tags=["data"], response_model=CombinedFeatureCollection)
 async def snapshot():
-    """Current combined snapshot: aircraft + camera detections."""
     return await build_combined_snapshot()
 
 
 @app.get("/api/cameras", tags=["cameras"], response_model=CameraList)
 async def cameras():
-    """Camera metadata list. Phase 2: metadata only."""
     return CameraList(cameras=get_all_cameras())
 
 
-@app.get(
-    "/api/history/aircraft",
-    tags=["history"],
-    response_model=AircraftHistoryResponse,
-    summary="Recent aircraft observations",
-    description=(
-        "Returns the most recent aircraft observations from SQLite, newest first. "
-        "Note: logging failures do not affect the live feed."
-    ),
-)
+@app.get("/api/history/aircraft", tags=["history"], response_model=AircraftHistoryResponse)
 async def history_aircraft(
-    limit: int = Query(default=100, ge=1, le=1000, description="Max records to return"),
-    offset: int = Query(default=0, ge=0, description="Records to skip"),
-    callsign: Optional[str] = Query(default=None, description="Case-insensitive callsign search"),
-    source: Optional[str] = Query(default=None, description="Filter by source: simulated | opensky"),
-    altitude_only: bool = Query(default=False, description="Only include aircraft with altitude"),
-    since: Optional[datetime] = Query(default=None, description="Inclusive lower observed_at bound"),
-    until: Optional[datetime] = Query(default=None, description="Inclusive upper observed_at bound"),
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+    callsign: Optional[str] = Query(default=None),
+    source: Optional[str] = Query(default=None),
+    altitude_only: bool = Query(default=False),
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
 ):
     from app.repositories.aircraft_repo import get_recent_aircraft
 
@@ -178,24 +145,15 @@ async def history_aircraft(
     )
 
 
-@app.get(
-    "/api/history/detections",
-    tags=["history"],
-    response_model=DetectionHistoryResponse,
-    summary="Recent Gemini camera detections",
-    description=(
-        "Returns the most recent Gemini analysis detections. "
-        "Coordinates are approximate (camera lat/lon + jitter)."
-    ),
-)
+@app.get("/api/history/detections", tags=["history"], response_model=DetectionHistoryResponse)
 async def history_detections(
-    limit: int = Query(default=100, ge=1, le=1000, description="Max records to return"),
-    offset: int = Query(default=0, ge=0, description="Records to skip"),
-    category: Optional[str] = Query(default=None, description="Filter by detection category"),
-    camera_id: Optional[str] = Query(default=None, description="Filter by camera ID"),
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+    category: Optional[str] = Query(default=None),
+    camera_id: Optional[str] = Query(default=None),
     min_confidence: Optional[float] = Query(default=None, ge=0.0, le=1.0),
-    since: Optional[datetime] = Query(default=None, description="Inclusive lower detected_at bound"),
-    until: Optional[datetime] = Query(default=None, description="Inclusive upper detected_at bound"),
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
 ):
     from app.repositories.detection_repo import get_recent_detections
 
@@ -217,16 +175,10 @@ async def history_detections(
     )
 
 
-@app.get(
-    "/api/history/cameras",
-    tags=["history"],
-    response_model=CameraSnapshotHistoryResponse,
-    summary="Recent camera snapshot cycles",
-    description="Returns camera reachability check history (online/offline status over time).",
-)
+@app.get("/api/history/cameras", tags=["history"], response_model=CameraSnapshotHistoryResponse)
 async def history_cameras(
     limit: int = Query(default=100, ge=1, le=1000),
-    camera_id: Optional[str] = Query(default=None, description="Filter by camera ID"),
+    camera_id: Optional[str] = Query(default=None),
 ):
     from app.repositories.camera_repo import get_recent_camera_snapshots
 
@@ -234,75 +186,58 @@ async def history_cameras(
     return CameraSnapshotHistoryResponse(count=len(records), records=records)
 
 
-@app.get(
-    "/api/history/summary",
-    tags=["history"],
-    response_model=HistorySummary,
-    summary="Historical statistics summary",
-    description="Aggregated counts and timestamps from the SQLite log.",
-)
+@app.get("/api/history/summary", tags=["history"], response_model=HistorySummary)
 async def history_summary(
-    category: Optional[str] = Query(default=None, description="Detection category filter"),
-    camera_id: Optional[str] = Query(default=None, description="Detection camera filter"),
+    category: Optional[str] = Query(default=None),
+    camera_id: Optional[str] = Query(default=None),
     min_confidence: Optional[float] = Query(default=None, ge=0.0, le=1.0),
-    source: Optional[str] = Query(default=None, description="Aircraft source filter"),
-    callsign: Optional[str] = Query(default=None, description="Aircraft callsign search"),
-    altitude_only: bool = Query(default=False, description="Only aircraft with altitude"),
-    since: Optional[datetime] = Query(default=None, description="Inclusive lower timestamp bound"),
-    until: Optional[datetime] = Query(default=None, description="Inclusive upper timestamp bound"),
+    source: Optional[str] = Query(default=None),
+    callsign: Optional[str] = Query(default=None),
+    altitude_only: bool = Query(default=False),
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
 ):
-    from app.repositories.aircraft_repo import (
-        count_aircraft_observations,
-        get_latest_aircraft_time,
-    )
-    from app.repositories.detection_repo import (
-        count_detections,
-        get_detection_counts_by_category,
-        get_latest_detection_time,
-    )
+    from app.repositories.aircraft_repo import count_aircraft_observations, get_latest_aircraft_time
+    from app.repositories.detection_repo import count_detections, get_detection_counts_by_category, get_latest_detection_time
 
-    (
-        total_aircraft,
-        total_detections,
-        by_category,
-        latest_aircraft,
-        latest_detection,
-    ) = await asyncio.gather(
-        count_aircraft_observations(
-            callsign=callsign,
-            source=source,
-            altitude_only=altitude_only,
-            since=since,
-            until=until,
-        ),
-        count_detections(
-            category=category,
-            camera_id=camera_id,
-            min_confidence=min_confidence,
-            since=since,
-            until=until,
-        ),
-        get_detection_counts_by_category(
-            category=category,
-            camera_id=camera_id,
-            min_confidence=min_confidence,
-            since=since,
-            until=until,
-        ),
-        get_latest_aircraft_time(
-            callsign=callsign,
-            source=source,
-            altitude_only=altitude_only,
-            since=since,
-            until=until,
-        ),
-        get_latest_detection_time(
-            category=category,
-            camera_id=camera_id,
-            min_confidence=min_confidence,
-            since=since,
-            until=until,
-        ),
+    total_aircraft, total_detections, by_category, latest_aircraft, latest_detection = (
+        await asyncio.gather(
+            count_aircraft_observations(
+                callsign=callsign,
+                source=source,
+                altitude_only=altitude_only,
+                since=since,
+                until=until,
+            ),
+            count_detections(
+                category=category,
+                camera_id=camera_id,
+                min_confidence=min_confidence,
+                since=since,
+                until=until,
+            ),
+            get_detection_counts_by_category(
+                category=category,
+                camera_id=camera_id,
+                min_confidence=min_confidence,
+                since=since,
+                until=until,
+            ),
+            get_latest_aircraft_time(
+                callsign=callsign,
+                source=source,
+                altitude_only=altitude_only,
+                since=since,
+                until=until,
+            ),
+            get_latest_detection_time(
+                category=category,
+                camera_id=camera_id,
+                min_confidence=min_confidence,
+                since=since,
+                until=until,
+            ),
+        )
     )
 
     return HistorySummary(
@@ -314,13 +249,43 @@ async def history_summary(
     )
 
 
+@app.get("/api/alerts", tags=["alerts"], response_model=AlertsResponse)
+async def alerts():
+    alert_records = await derive_alert_records()
+    return AlertsResponse(count=len(alert_records), alerts=alert_records)
+
+
+@app.get("/api/alerts/summary", tags=["alerts"], response_model=AlertsSummary)
+async def alerts_summary():
+    return await get_alerts_summary()
+
+
+@app.post("/api/alerts/{alert_id}/acknowledge", tags=["alerts"], response_model=AlertStatusResponse)
+async def acknowledge_alert(alert_id: str):
+    from app.repositories.alert_repo import set_alert_status
+
+    valid_ids = {alert.id for alert in await derive_alert_records()}
+    if alert_id not in valid_ids:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    status = await set_alert_status(alert_id, "acknowledged")
+    return AlertStatusResponse(id=alert_id, status=status)
+
+
+@app.post("/api/alerts/{alert_id}/resolve", tags=["alerts"], response_model=AlertStatusResponse)
+async def resolve_alert(alert_id: str):
+    from app.repositories.alert_repo import set_alert_status
+
+    valid_ids = {alert.id for alert in await derive_alert_records()}
+    if alert_id not in valid_ids:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    status = await set_alert_status(alert_id, "resolved")
+    return AlertStatusResponse(id=alert_id, status=status)
+
+
 @app.websocket("/ws/live")
 async def websocket_live(websocket: WebSocket):
-    """
-    Live combined feed over WebSocket.
-    Immediately sends the current snapshot on connect, then broadcast_loop
-    pushes updates every broadcast_interval seconds.
-    """
     await manager.connect(websocket)
     try:
         initial = await build_combined_snapshot()

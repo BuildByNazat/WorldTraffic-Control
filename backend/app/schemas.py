@@ -1,10 +1,5 @@
 """
 Pydantic schemas for WorldTraffic Control data models.
-
-Aircraft schemas follow the GeoJSON spec (RFC 7946).
-Camera schemas represent metadata-only state.
-Detection schemas represent Gemini analysis results - coordinates are approximate.
-History schemas are flat record types for the SQLite history API endpoints.
 """
 
 from datetime import datetime
@@ -82,8 +77,6 @@ class DetectionFeature(BaseModel):
 
 
 class CombinedFeatureCollection(BaseModel):
-    """GeoJSON FeatureCollection holding aircraft and camera detection features."""
-
     type: Literal["FeatureCollection"] = "FeatureCollection"
     features: List[Union[AircraftFeature, DetectionFeature]] = Field(default_factory=list)
 
@@ -100,8 +93,6 @@ class ServiceStatus(BaseModel):
 
 
 class AircraftObservationRecord(BaseModel):
-    """Flat record returned by GET /api/history/aircraft."""
-
     id: int
     feature_id: str
     callsign: Optional[str] = None
@@ -117,8 +108,6 @@ class AircraftObservationRecord(BaseModel):
 
 
 class AircraftHistoryResponse(BaseModel):
-    """Paginated aircraft observation results."""
-
     count: int
     total: int
     limit: int
@@ -127,8 +116,6 @@ class AircraftHistoryResponse(BaseModel):
 
 
 class DetectionRecord(BaseModel):
-    """Flat record returned by GET /api/history/detections."""
-
     id: int
     feature_id: str
     category: str
@@ -144,8 +131,6 @@ class DetectionRecord(BaseModel):
 
 
 class DetectionHistoryResponse(BaseModel):
-    """Paginated detection results."""
-
     count: int
     total: int
     limit: int
@@ -154,8 +139,6 @@ class DetectionHistoryResponse(BaseModel):
 
 
 class CameraSnapshotRecord(BaseModel):
-    """Flat record returned by GET /api/history/cameras."""
-
     id: int
     camera_id: str
     image_url: str
@@ -166,15 +149,11 @@ class CameraSnapshotRecord(BaseModel):
 
 
 class CameraSnapshotHistoryResponse(BaseModel):
-    """Paginated camera snapshot results."""
-
     count: int
     records: List[CameraSnapshotRecord]
 
 
 class HistorySummary(BaseModel):
-    """Aggregated statistics returned by GET /api/history/summary."""
-
     total_aircraft_observations: int
     total_detections: int
     detections_by_category: Dict[str, int]
@@ -182,3 +161,35 @@ class HistorySummary(BaseModel):
     latest_detection_detected_at: Optional[datetime] = None
 
     model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
+
+
+class AlertRecord(BaseModel):
+    id: str
+    title: str
+    category: str
+    severity: Literal["high", "medium", "low"]
+    timestamp: datetime
+    latitude: float
+    longitude: float
+    source: str
+    camera_id: Optional[str] = None
+    feature_ids: List[str] = Field(default_factory=list)
+    status: Literal["new", "acknowledged", "resolved"]
+
+    model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
+
+
+class AlertsResponse(BaseModel):
+    count: int
+    alerts: List[AlertRecord]
+
+
+class AlertsSummary(BaseModel):
+    total_open_alerts: int
+    alerts_by_severity: Dict[str, int]
+    alerts_by_category: Dict[str, int]
+
+
+class AlertStatusResponse(BaseModel):
+    id: str
+    status: Literal["new", "acknowledged", "resolved"]
