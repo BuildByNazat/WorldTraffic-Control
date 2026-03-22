@@ -665,6 +665,42 @@ body {
   padding: 8px 0;
 }
 
+.history-list__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px 16px;
+}
+
+.history-list__count {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.history-load-more {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.74rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.history-load-more:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: rgba(88, 166, 255, 0.08);
+}
+
+.history-load-more:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .history-item {
   display: flex;
   align-items: flex-start;

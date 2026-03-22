@@ -3,19 +3,15 @@ Pydantic schemas for WorldTraffic Control data models.
 
 Aircraft schemas follow the GeoJSON spec (RFC 7946).
 Camera schemas represent metadata-only state.
-Detection schemas represent Gemini analysis results — coordinates are APPROXIMATE.
+Detection schemas represent Gemini analysis results - coordinates are approximate.
 History schemas are flat record types for the SQLite history API endpoints.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
-
-# ---------------------------------------------------------------------------
-# Aircraft Schemas (GeoJSON — stable)
-# ---------------------------------------------------------------------------
 
 class AircraftProperties(BaseModel):
     id: str
@@ -43,10 +39,6 @@ class AircraftFeatureCollection(BaseModel):
     features: List[AircraftFeature]
 
 
-# ---------------------------------------------------------------------------
-# Camera Schemas (Metadata Only — Phase 2)
-# ---------------------------------------------------------------------------
-
 class CameraMetadata(BaseModel):
     id: str
     name: str
@@ -64,21 +56,13 @@ class CameraList(BaseModel):
     cameras: List[CameraMetadata]
 
 
-# ---------------------------------------------------------------------------
-# Detection Schemas (Phase 3 — Gemini Analysis)
-#
-# ⚠️  COORDINATE APPROXIMATION:
-#     Detections are placed at the camera's lat/lon with a small jitter.
-#     These are NOT precise object geolocations.
-# ---------------------------------------------------------------------------
-
 class DetectionProperties(BaseModel):
     id: str
     category: str
     label: str
     confidence: float = Field(..., ge=0.0, le=1.0)
-    latitude: float   # ⚠️ Approximate — camera lat/lon + jitter
-    longitude: float  # ⚠️ Approximate — camera lat/lon + jitter
+    latitude: float
+    longitude: float
     source: Literal["gemini_camera"] = "gemini_camera"
     camera_id: str
     detected_at: Optional[datetime] = None
@@ -97,19 +81,12 @@ class DetectionFeature(BaseModel):
     properties: DetectionProperties
 
 
-# ---------------------------------------------------------------------------
-# Combined Snapshot Schema (Aircraft + Detections merged — live payload)
-# ---------------------------------------------------------------------------
-
 class CombinedFeatureCollection(BaseModel):
     """GeoJSON FeatureCollection holding aircraft and camera detection features."""
+
     type: Literal["FeatureCollection"] = "FeatureCollection"
     features: List[Union[AircraftFeature, DetectionFeature]] = Field(default_factory=list)
 
-
-# ---------------------------------------------------------------------------
-# Status / Debug Schema
-# ---------------------------------------------------------------------------
 
 class ServiceStatus(BaseModel):
     status: Literal["ok"] = "ok"
@@ -122,12 +99,9 @@ class ServiceStatus(BaseModel):
     db_path: str
 
 
-# ---------------------------------------------------------------------------
-# History API Response Schemas (Phase 4 — SQLite)
-# ---------------------------------------------------------------------------
-
 class AircraftObservationRecord(BaseModel):
     """Flat record returned by GET /api/history/aircraft."""
+
     id: int
     feature_id: str
     callsign: Optional[str] = None
@@ -144,12 +118,17 @@ class AircraftObservationRecord(BaseModel):
 
 class AircraftHistoryResponse(BaseModel):
     """Paginated aircraft observation results."""
+
     count: int
+    total: int
+    limit: int
+    offset: int
     records: List[AircraftObservationRecord]
 
 
 class DetectionRecord(BaseModel):
     """Flat record returned by GET /api/history/detections."""
+
     id: int
     feature_id: str
     category: str
@@ -166,12 +145,17 @@ class DetectionRecord(BaseModel):
 
 class DetectionHistoryResponse(BaseModel):
     """Paginated detection results."""
+
     count: int
+    total: int
+    limit: int
+    offset: int
     records: List[DetectionRecord]
 
 
 class CameraSnapshotRecord(BaseModel):
     """Flat record returned by GET /api/history/cameras."""
+
     id: int
     camera_id: str
     image_url: str
@@ -183,12 +167,14 @@ class CameraSnapshotRecord(BaseModel):
 
 class CameraSnapshotHistoryResponse(BaseModel):
     """Paginated camera snapshot results."""
+
     count: int
     records: List[CameraSnapshotRecord]
 
 
 class HistorySummary(BaseModel):
     """Aggregated statistics returned by GET /api/history/summary."""
+
     total_aircraft_observations: int
     total_detections: int
     detections_by_category: Dict[str, int]

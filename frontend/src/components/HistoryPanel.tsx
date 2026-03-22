@@ -1,10 +1,10 @@
 /**
- * HistoryPanel â€” right-side sliding panel for historical data.
+ * HistoryPanel - right-side sliding panel for historical data.
  *
  * Tabs:
- *   Summary â€” aggregated statistics from /api/history/summary
- *   Detections â€” scrollable list of recent Gemini camera detections
- *   Aircraft â€” scrollable list of recent aircraft observations
+ *   Summary - aggregated statistics from /api/history/summary
+ *   Detections - scrollable list of recent Gemini camera detections
+ *   Aircraft - scrollable list of recent aircraft observations
  *
  * Clicking a detection or aircraft item calls onSelectLocation so the map
  * can fly to that coordinate.
@@ -13,7 +13,7 @@
 import React, { useEffect, useState } from "react";
 import HistoryFilters from "./HistoryFilters";
 import type { AircraftRecord, HistoryFeedState } from "../hooks/useHistoryFeed";
-import { useFilteredHistory } from "../hooks/useFilteredHistory";
+import type { FilteredHistoryState } from "../hooks/useFilteredHistory";
 
 export interface SelectedLocation {
   lat: number;
@@ -26,6 +26,7 @@ type HistoryTab = "summary" | "detections" | "aircraft";
 
 interface HistoryPanelProps {
   feed: HistoryFeedState;
+  filters: FilteredHistoryState;
   onSelectLocation: (loc: SelectedLocation | null) => void;
   selectedFeatureId: string | null;
 }
@@ -98,7 +99,7 @@ function SummaryTab({
 
       {hasActiveFilters && (
         <div className="history-summary__note">
-          Summary reflects the current filtered view of loaded history records.
+          Summary reflects the current backend filter state.
         </div>
       )}
 
@@ -140,24 +141,48 @@ function SummaryTab({
   );
 }
 
+function LoadMoreFooter({
+  visibleCount,
+  totalCount,
+  onLoadMore,
+  loadingMore,
+}: {
+  visibleCount: number;
+  totalCount: number;
+  onLoadMore: () => void;
+  loadingMore: boolean;
+}) {
+  return (
+    <div className="history-list__footer">
+      <span className="history-list__count">
+        Showing {visibleCount.toLocaleString()} of {totalCount.toLocaleString()}
+      </span>
+      <button
+        type="button"
+        className="history-load-more"
+        onClick={onLoadMore}
+        disabled={loadingMore}
+      >
+        {loadingMore ? "Loading…" : "Load more"}
+      </button>
+    </div>
+  );
+}
+
 function DetectionsTab({
-  detections,
-  loading,
-  error,
+  feed,
   onSelect,
   selectedId,
   hasActiveFilters,
 }: {
-  detections: HistoryFeedState["detections"];
-  loading: boolean;
-  error: string | null;
+  feed: HistoryFeedState;
   onSelect: (loc: SelectedLocation | null) => void;
   selectedId: string | null;
   hasActiveFilters: boolean;
 }) {
-  if (loading) return <div className="history-empty">Loading detections…</div>;
-  if (error) return <div className="history-error">{error}</div>;
-  if (detections.length === 0) {
+  if (feed.loading) return <div className="history-empty">Loading detections…</div>;
+  if (feed.error) return <div className="history-error">{feed.error}</div>;
+  if (feed.detections.length === 0) {
     return (
       <div className="history-empty">
         {hasActiveFilters
@@ -175,7 +200,7 @@ function DetectionsTab({
 
   return (
     <div className="history-list">
-      {detections.map((detection) => {
+      {feed.detections.map((detection) => {
         const isSelected = selectedId === detection.feature_id;
 
         return (
@@ -211,28 +236,33 @@ function DetectionsTab({
           </button>
         );
       })}
+
+      {feed.hasMoreDetections && (
+        <LoadMoreFooter
+          visibleCount={feed.detections.length}
+          totalCount={feed.detectionsTotal}
+          onLoadMore={feed.loadMoreDetections}
+          loadingMore={feed.loadingMoreDetections}
+        />
+      )}
     </div>
   );
 }
 
 function AircraftTab({
-  aircraft,
-  loading,
-  error,
+  feed,
   onSelect,
   selectedId,
   hasActiveFilters,
 }: {
-  aircraft: HistoryFeedState["aircraft"];
-  loading: boolean;
-  error: string | null;
+  feed: HistoryFeedState;
   onSelect: (loc: SelectedLocation | null) => void;
   selectedId: string | null;
   hasActiveFilters: boolean;
 }) {
-  if (loading) return <div className="history-empty">Loading aircraft logs…</div>;
-  if (error) return <div className="history-error">{error}</div>;
-  if (aircraft.length === 0) {
+  if (feed.loading) return <div className="history-empty">Loading aircraft logs…</div>;
+  if (feed.error) return <div className="history-error">{feed.error}</div>;
+  if (feed.aircraft.length === 0) {
     return (
       <div className="history-empty">
         {hasActiveFilters
@@ -250,7 +280,7 @@ function AircraftTab({
 
   return (
     <div className="history-list">
-      {aircraft.map((record: AircraftRecord) => {
+      {feed.aircraft.map((record: AircraftRecord) => {
         const isSelected = selectedId === record.feature_id;
         const label = record.callsign ?? record.feature_id;
 
@@ -287,38 +317,38 @@ function AircraftTab({
           </button>
         );
       })}
+
+      {feed.hasMoreAircraft && (
+        <LoadMoreFooter
+          visibleCount={feed.aircraft.length}
+          totalCount={feed.aircraftTotal}
+          onLoadMore={feed.loadMoreAircraft}
+          loadingMore={feed.loadingMoreAircraft}
+        />
+      )}
     </div>
   );
 }
 
 const HistoryPanel: React.FC<HistoryPanelProps> = ({
   feed,
+  filters,
   onSelectLocation,
   selectedFeatureId,
 }) => {
   const [tab, setTab] = useState<HistoryTab>("summary");
-  const filteredHistory = useFilteredHistory(feed);
 
   useEffect(() => {
     if (!selectedFeatureId) return;
 
     const selectedStillVisible =
-      filteredHistory.filteredDetections.some(
-        (record) => record.feature_id === selectedFeatureId
-      ) ||
-      filteredHistory.filteredAircraft.some(
-        (record) => record.feature_id === selectedFeatureId
-      );
+      feed.detections.some((record) => record.feature_id === selectedFeatureId) ||
+      feed.aircraft.some((record) => record.feature_id === selectedFeatureId);
 
     if (!selectedStillVisible) {
       onSelectLocation(null);
     }
-  }, [
-    filteredHistory.filteredAircraft,
-    filteredHistory.filteredDetections,
-    onSelectLocation,
-    selectedFeatureId,
-  ]);
+  }, [feed.aircraft, feed.detections, onSelectLocation, selectedFeatureId]);
 
   return (
     <div className="history-panel" role="complementary" aria-label="History panel">
@@ -354,56 +384,44 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
       </div>
 
       <HistoryFilters
-        filters={filteredHistory.filters}
-        availableCameraIds={filteredHistory.availableCameraIds}
+        filters={filters.filters}
+        availableCameraIds={feed.cameraIds}
         onDetectionCategoryChange={(value) =>
-          filteredHistory.updateFilter("detectionCategory", value)
+          filters.updateFilter("detectionCategory", value)
         }
-        onMinConfidenceChange={(value) =>
-          filteredHistory.updateFilter("minConfidence", value)
-        }
-        onCameraIdChange={(value) => filteredHistory.updateFilter("cameraId", value)}
-        onAircraftSourceChange={(value) =>
-          filteredHistory.updateFilter("aircraftSource", value)
-        }
-        onCallsignQueryChange={(value) =>
-          filteredHistory.updateFilter("callsignQuery", value)
-        }
-        onAltitudeOnlyChange={(value) =>
-          filteredHistory.updateFilter("altitudeOnly", value)
-        }
-        onTimeRangeChange={(value) => filteredHistory.updateFilter("timeRange", value)}
-        onReset={filteredHistory.resetFilters}
+        onMinConfidenceChange={(value) => filters.updateFilter("minConfidence", value)}
+        onCameraIdChange={(value) => filters.updateFilter("cameraId", value)}
+        onAircraftSourceChange={(value) => filters.updateFilter("aircraftSource", value)}
+        onCallsignQueryChange={(value) => filters.updateFilter("callsignQuery", value)}
+        onAltitudeOnlyChange={(value) => filters.updateFilter("altitudeOnly", value)}
+        onTimeRangeChange={(value) => filters.updateFilter("timeRange", value)}
+        onReset={filters.resetFilters}
         disabled={feed.loading}
       />
 
       <div className="history-panel__content">
         {tab === "summary" && (
           <SummaryTab
-            summary={filteredHistory.summary}
+            summary={feed.summary}
             loading={feed.loading}
             error={feed.error}
-            hasActiveFilters={filteredHistory.hasActiveFilters}
+            hasActiveFilters={filters.hasActiveFilters}
           />
         )}
         {tab === "detections" && (
           <DetectionsTab
-            detections={filteredHistory.filteredDetections}
-            loading={feed.loading}
-            error={feed.error}
+            feed={feed}
             onSelect={onSelectLocation}
             selectedId={selectedFeatureId}
-            hasActiveFilters={filteredHistory.hasActiveFilters}
+            hasActiveFilters={filters.hasActiveFilters}
           />
         )}
         {tab === "aircraft" && (
           <AircraftTab
-            aircraft={filteredHistory.filteredAircraft}
-            loading={feed.loading}
-            error={feed.error}
+            feed={feed}
             onSelect={onSelectLocation}
             selectedId={selectedFeatureId}
-            hasActiveFilters={filteredHistory.hasActiveFilters}
+            hasActiveFilters={filters.hasActiveFilters}
           />
         )}
       </div>
