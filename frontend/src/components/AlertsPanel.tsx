@@ -5,6 +5,7 @@ interface AlertsPanelProps {
   alertsState: AlertsState;
   onSelectAlert: (alert: AlertRecord) => void;
   variant?: "full" | "compact";
+  selectedAlertId?: string | null;
 }
 
 function formatTime(value: string): string {
@@ -22,6 +23,7 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
   alertsState,
   onSelectAlert,
   variant = "full",
+  selectedAlertId = null,
 }) => {
   const { alerts, summary, loading, error, acknowledge, resolve, newestAlertNotice } =
     alertsState;
@@ -99,7 +101,9 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
         {visibleAlerts.map((alert) => (
           <div
             key={alert.id}
-            className={`alert-card alert-card--${alert.severity} alert-card--status-${alert.status}`}
+            className={`alert-card alert-card--${alert.severity} alert-card--status-${alert.status}${
+              selectedAlertId === alert.id ? " alert-card--selected" : ""
+            }`}
           >
             <button
               type="button"

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { SelectedHistoryDetail } from "../types/selectedEvent";
 
 export interface ReplayEvent {
   eventKey: string;
@@ -8,6 +9,7 @@ export interface ReplayEvent {
   typeLabel: "Detection" | "Aircraft";
   lat: number;
   lon: number;
+  detail: SelectedHistoryDetail;
 }
 
 export interface ReplayState {
