@@ -9,7 +9,7 @@
  * mode simply shows the panel and allows selecting historical points.
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import LiveMap from "./components/LiveMap";
 import type { HighlightLocation } from "./components/LiveMap";
 import StatusPanel from "./components/StatusPanel";
@@ -18,15 +18,18 @@ import type { AppMode } from "./components/ModeToggle";
 import HistoryPanel from "./components/HistoryPanel";
 import AlertsPanel from "./components/AlertsPanel";
 import EventDetailDrawer from "./components/EventDetailDrawer";
+import IncidentsPanel from "./components/IncidentsPanel";
 import LayerControls from "./components/LayerControls";
 import { useLiveFeed, isAircraftFeature } from "./hooks/useLiveFeed";
 import { useFilteredHistory } from "./hooks/useFilteredHistory";
 import { useHistoryFeed } from "./hooks/useHistoryFeed";
 import { useAlerts, type AlertRecord } from "./hooks/useAlerts";
+import { useIncidents, type IncidentRecord } from "./hooks/useIncidents";
 import { useMapLayers } from "./hooks/useMapLayers";
 import type {
   SelectedAlertDetail,
   SelectedEventDetail,
+  SelectedIncidentDetail,
 } from "./types/selectedEvent";
 
 const App: React.FC = () => {
@@ -40,11 +43,40 @@ const App: React.FC = () => {
   const historyFilters = useFilteredHistory();
   const historyFeed = useHistoryFeed(mode === "history", historyFilters.filters);
   const alertsState = useAlerts(true);
+  const incidentsState = useIncidents(true);
   const mapLayers = useMapLayers();
 
   const aircraftCount = data?.features.filter(isAircraftFeature).length ?? 0;
   const detectionCount =
     data?.features.filter((feature) => !isAircraftFeature(feature)).length ?? 0;
+  const linkedIncident = useMemo(() => {
+    if (selectedEvent?.kind === "alert") {
+      return incidentsState.getIncidentByAlertId(selectedEvent.id);
+    }
+    if (selectedEvent?.kind === "incident") {
+      return (
+        incidentsState.incidents.find((incident) => incident.id === selectedEvent.id) ??
+        null
+      );
+    }
+    return null;
+  }, [incidentsState, selectedEvent]);
+
+  useEffect(() => {
+    if (selectedEvent?.kind !== "incident") return;
+    const nextIncident = incidentsState.incidents.find(
+      (incident) => incident.id === selectedEvent.id
+    );
+    if (!nextIncident) return;
+    if (
+      selectedEvent.timestamp === nextIncident.updated_at &&
+      selectedEvent.status === nextIncident.status &&
+      selectedEvent.operatorNotes === nextIncident.operator_notes
+    ) {
+      return;
+    }
+    handleSelectIncident(nextIncident);
+  }, [incidentsState.incidents, selectedEvent]);
 
   function clearSelection() {
     setSelectedEvent(null);
@@ -91,6 +123,38 @@ const App: React.FC = () => {
     handleSelectEvent(detail);
   }
 
+  function handleSelectIncident(incident: IncidentRecord) {
+    const detail: SelectedIncidentDetail = {
+      kind: "incident",
+      id: incident.id,
+      label: incident.title,
+      sourceAlertId: incident.source_alert_id,
+      category: incident.category,
+      severity: incident.severity,
+      status: incident.status,
+      timestamp: incident.updated_at,
+      latitude: incident.latitude,
+      longitude: incident.longitude,
+      source: "incident_case",
+      cameraId: incident.camera_id,
+      featureIds: incident.related_feature_ids,
+      operatorNotes: incident.operator_notes,
+    };
+
+    handleSelectEvent(detail);
+  }
+
+  async function handleCreateIncidentFromSelectedAlert() {
+    if (selectedEvent?.kind !== "alert") return;
+    const alert = alertsState.alerts.find((item) => item.id === selectedEvent.id);
+    if (!alert) return;
+
+    const incident = await incidentsState.createFromAlert(alert);
+    if (incident) {
+      handleSelectIncident(incident);
+    }
+  }
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -111,7 +175,7 @@ const App: React.FC = () => {
           highlightVariant={
             selectedEvent?.kind === "history"
               ? "replay"
-              : selectedEvent?.kind === "alert"
+              : selectedEvent?.kind === "alert" || selectedEvent?.kind === "incident"
                 ? "selected"
                 : null
           }
@@ -138,7 +202,29 @@ const App: React.FC = () => {
           selectedAlertId={selectedEvent?.kind === "alert" ? selectedEvent.id : null}
         />
 
-        <EventDetailDrawer selectedEvent={selectedEvent} onClose={clearSelection} />
+        <EventDetailDrawer
+          selectedEvent={selectedEvent}
+          onClose={clearSelection}
+          linkedIncident={linkedIncident}
+          onCreateIncidentFromAlert={() => {
+            void handleCreateIncidentFromSelectedAlert();
+          }}
+          onOpenLinkedIncident={() => {
+            if (linkedIncident) {
+              handleSelectIncident(linkedIncident);
+            }
+          }}
+        />
+
+        {mode === "history" && (
+          <IncidentsPanel
+            incidentsState={incidentsState}
+            selectedIncidentId={
+              selectedEvent?.kind === "incident" ? selectedEvent.id : null
+            }
+            onSelectIncident={handleSelectIncident}
+          />
+        )}
 
         {mode === "history" && (
           <HistoryPanel

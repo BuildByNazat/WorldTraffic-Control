@@ -193,3 +193,34 @@ class AlertsSummary(BaseModel):
 class AlertStatusResponse(BaseModel):
     id: str
     status: Literal["new", "acknowledged", "resolved"]
+
+
+class IncidentRecord(BaseModel):
+    id: str
+    title: str
+    source_alert_id: str
+    category: str
+    severity: Literal["high", "medium", "low"]
+    status: Literal["open", "under_review", "closed"]
+    created_at: datetime
+    updated_at: datetime
+    latitude: float
+    longitude: float
+    camera_id: Optional[str] = None
+    operator_notes: str = ""
+    related_feature_ids: List[str] = Field(default_factory=list)
+
+    model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
+
+
+class IncidentsResponse(BaseModel):
+    count: int
+    incidents: List[IncidentRecord]
+
+
+class IncidentStatusUpdateRequest(BaseModel):
+    status: Literal["open", "under_review", "closed"]
+
+
+class IncidentNoteUpdateRequest(BaseModel):
+    operator_notes: str = ""

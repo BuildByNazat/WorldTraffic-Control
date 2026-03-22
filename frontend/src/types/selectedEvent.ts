@@ -31,4 +31,16 @@ export interface SelectedHistoryDetail extends SelectedEventBase {
   replayTotal?: number | null;
 }
 
-export type SelectedEventDetail = SelectedAlertDetail | SelectedHistoryDetail;
+export interface SelectedIncidentDetail extends SelectedEventBase {
+  kind: "incident";
+  sourceAlertId: string;
+  category: string;
+  severity: "high" | "medium" | "low";
+  status: "open" | "under_review" | "closed";
+  operatorNotes: string;
+}
+
+export type SelectedEventDetail =
+  | SelectedAlertDetail
+  | SelectedHistoryDetail
+  | SelectedIncidentDetail;

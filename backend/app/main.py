@@ -23,12 +23,17 @@ from app.schemas import (
     CombinedFeatureCollection,
     DetectionHistoryResponse,
     HistorySummary,
+    IncidentNoteUpdateRequest,
+    IncidentRecord,
+    IncidentStatusUpdateRequest,
+    IncidentsResponse,
     ServiceStatus,
 )
 from app.services.alerts import derive_alert_records, get_alerts_summary
 from app.services.broadcaster import broadcast_loop, build_combined_snapshot, manager
 from app.services.camera_registry import get_all_cameras
 from app.services.cameras import camera_fetch_loop
+from app.services.incidents import create_incident_from_alert, get_incidents
 from app.services.providers.factory import factory
 
 logging.basicConfig(
@@ -282,6 +287,58 @@ async def resolve_alert(alert_id: str):
 
     status = await set_alert_status(alert_id, "resolved")
     return AlertStatusResponse(id=alert_id, status=status)
+
+
+@app.get("/api/incidents", tags=["incidents"], response_model=IncidentsResponse)
+async def incidents():
+    incident_records = await get_incidents()
+    return IncidentsResponse(count=len(incident_records), incidents=incident_records)
+
+
+@app.get("/api/incidents/{incident_id}", tags=["incidents"], response_model=IncidentRecord)
+async def incident_detail(incident_id: str):
+    from app.repositories.incident_repo import get_incident_by_id
+
+    incident = await get_incident_by_id(incident_id)
+    if incident is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return incident
+
+
+@app.post(
+    "/api/incidents/from-alert/{alert_id}",
+    tags=["incidents"],
+    response_model=IncidentRecord,
+)
+async def promote_alert_to_incident(alert_id: str):
+    incident = await create_incident_from_alert(alert_id)
+    if incident is None:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return incident
+
+
+@app.post("/api/incidents/{incident_id}/status", tags=["incidents"], response_model=IncidentRecord)
+async def update_incident_status(
+    incident_id: str, payload: IncidentStatusUpdateRequest
+):
+    from app.repositories.incident_repo import update_incident_status as save_status
+
+    incident = await save_status(incident_id, payload.status)
+    if incident is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return incident
+
+
+@app.post("/api/incidents/{incident_id}/note", tags=["incidents"], response_model=IncidentRecord)
+async def update_incident_note(
+    incident_id: str, payload: IncidentNoteUpdateRequest
+):
+    from app.repositories.incident_repo import update_incident_note as save_note
+
+    incident = await save_note(incident_id, payload.operator_notes)
+    if incident is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return incident
 
 
 @app.websocket("/ws/live")

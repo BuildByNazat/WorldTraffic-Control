@@ -6,6 +6,7 @@ Tables:
   camera_detections     - one row per Gemini detection
   camera_snapshots      - one row per camera reachability check cycle
   alert_states          - persisted operator status for derived alerts
+  incidents             - lightweight operator incident records
 """
 
 from datetime import datetime
@@ -65,3 +66,21 @@ class AlertState(Base):
     alert_id: Mapped[str] = mapped_column(String(160), primary_key=True)
     status: Mapped[str] = mapped_column(String(16), index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+
+
+class IncidentCase(Base):
+    __tablename__ = "incidents"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title: Mapped[str] = mapped_column(String(200))
+    source_alert_id: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    category: Mapped[str] = mapped_column(String(32), index=True)
+    severity: Mapped[str] = mapped_column(String(16), index=True)
+    status: Mapped[str] = mapped_column(String(24), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    latitude: Mapped[float] = mapped_column(Float)
+    longitude: Mapped[float] = mapped_column(Float)
+    camera_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    operator_notes: Mapped[str] = mapped_column(Text, default="")
+    related_feature_ids: Mapped[str] = mapped_column(Text, default="[]")

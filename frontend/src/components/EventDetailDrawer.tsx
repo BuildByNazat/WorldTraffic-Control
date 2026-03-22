@@ -1,9 +1,13 @@
 import React from "react";
+import type { IncidentRecord } from "../hooks/useIncidents";
 import type { SelectedEventDetail } from "../types/selectedEvent";
 
 interface EventDetailDrawerProps {
   selectedEvent: SelectedEventDetail | null;
   onClose: () => void;
+  linkedIncident: IncidentRecord | null;
+  onCreateIncidentFromAlert: () => void;
+  onOpenLinkedIncident: () => void;
 }
 
 function formatTime(value: string): string {
@@ -39,22 +43,26 @@ function DetailRow({
 const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
   selectedEvent,
   onClose,
+  linkedIncident,
+  onCreateIncidentFromAlert,
+  onOpenLinkedIncident,
 }) => {
   if (!selectedEvent) {
     return null;
   }
-
-  const title =
-    selectedEvent.kind === "alert" ? selectedEvent.label : selectedEvent.label;
 
   return (
     <aside className="event-detail" aria-label="Event details">
       <div className="event-detail__header">
         <div className="event-detail__heading">
           <span className="event-detail__eyebrow">
-            {selectedEvent.kind === "alert" ? "Alert Detail" : "Event Detail"}
+            {selectedEvent.kind === "alert"
+              ? "Alert Detail"
+              : selectedEvent.kind === "incident"
+                ? "Incident Detail"
+                : "Event Detail"}
           </span>
-          <span className="event-detail__title">{title}</span>
+          <span className="event-detail__title">{selectedEvent.label}</span>
         </div>
         <button
           type="button"
@@ -62,12 +70,12 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
           onClick={onClose}
           aria-label="Close event details"
         >
-          ×
+          x
         </button>
       </div>
 
       <div className="event-detail__content">
-        {selectedEvent.kind === "alert" ? (
+        {selectedEvent.kind === "alert" && (
           <>
             <DetailRow label="Category" value={selectedEvent.category} />
             <DetailRow label="Severity" value={selectedEvent.severity} />
@@ -90,15 +98,34 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
                   : "Not available"
               }
             />
+            <div className="event-detail__actions">
+              {linkedIncident ? (
+                <button
+                  type="button"
+                  className="event-detail__action"
+                  onClick={onOpenLinkedIncident}
+                >
+                  Open incident
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="event-detail__action"
+                  onClick={onCreateIncidentFromAlert}
+                >
+                  Create incident
+                </button>
+              )}
+            </div>
           </>
-        ) : (
+        )}
+
+        {selectedEvent.kind === "history" && (
           <>
             <DetailRow
               label="Type"
               value={
-                selectedEvent.eventType === "detection"
-                  ? "Detection"
-                  : "Aircraft"
+                selectedEvent.eventType === "detection" ? "Detection" : "Aircraft"
               }
             />
             <DetailRow label="Timestamp" value={formatTime(selectedEvent.timestamp)} />
@@ -157,6 +184,36 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
                   ? `${selectedEvent.replayIndex} / ${selectedEvent.replayTotal}`
                   : "Loaded event"
               }
+            />
+          </>
+        )}
+
+        {selectedEvent.kind === "incident" && (
+          <>
+            <DetailRow label="Category" value={selectedEvent.category} />
+            <DetailRow label="Severity" value={selectedEvent.severity} />
+            <DetailRow label="Status" value={selectedEvent.status} />
+            <DetailRow label="Timestamp" value={formatTime(selectedEvent.timestamp)} />
+            <DetailRow
+              label="Source alert"
+              value={selectedEvent.sourceAlertId}
+            />
+            <DetailRow label="Camera" value={selectedEvent.cameraId ?? "Not available"} />
+            <DetailRow
+              label="Location"
+              value={`${formatCoordinate(selectedEvent.latitude)}, ${formatCoordinate(selectedEvent.longitude)}`}
+            />
+            <DetailRow
+              label="Feature IDs"
+              value={
+                selectedEvent.featureIds.length > 0
+                  ? selectedEvent.featureIds.join(", ")
+                  : "Not available"
+              }
+            />
+            <DetailRow
+              label="Notes"
+              value={selectedEvent.operatorNotes || "No notes yet"}
             />
           </>
         )}
