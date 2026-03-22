@@ -224,3 +224,25 @@ class IncidentStatusUpdateRequest(BaseModel):
 
 class IncidentNoteUpdateRequest(BaseModel):
     operator_notes: str = ""
+
+
+class AnalyticsOverview(BaseModel):
+    total_detections: int
+    total_aircraft_observations: int
+    open_alerts_count: int
+    incidents_by_status: Dict[str, int]
+    detections_by_category: Dict[str, int]
+
+
+class AnalyticsTimeseriesPoint(BaseModel):
+    bucket_start: datetime
+    label: str
+    detections: int = 0
+    incidents: int = 0
+
+    model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
+
+
+class AnalyticsTimeseriesResponse(BaseModel):
+    bucket_unit: Literal["hour", "day"]
+    points: List[AnalyticsTimeseriesPoint]

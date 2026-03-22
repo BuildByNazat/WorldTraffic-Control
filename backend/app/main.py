@@ -14,6 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.db import close_db, init_db
 from app.schemas import (
+    AnalyticsOverview,
+    AnalyticsTimeseriesResponse,
     AircraftHistoryResponse,
     AlertStatusResponse,
     AlertsResponse,
@@ -29,6 +31,7 @@ from app.schemas import (
     IncidentsResponse,
     ServiceStatus,
 )
+from app.services.analytics import get_analytics_overview, get_analytics_timeseries
 from app.services.alerts import derive_alert_records, get_alerts_summary
 from app.services.broadcaster import broadcast_loop, build_combined_snapshot, manager
 from app.services.camera_registry import get_all_cameras
@@ -339,6 +342,50 @@ async def update_incident_note(
     if incident is None:
         raise HTTPException(status_code=404, detail="Incident not found")
     return incident
+
+
+@app.get("/api/analytics/overview", tags=["analytics"], response_model=AnalyticsOverview)
+async def analytics_overview(
+    category: Optional[str] = Query(default=None),
+    camera_id: Optional[str] = Query(default=None),
+    min_confidence: Optional[float] = Query(default=None, ge=0.0, le=1.0),
+    source: Optional[str] = Query(default=None),
+    callsign: Optional[str] = Query(default=None),
+    altitude_only: bool = Query(default=False),
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
+):
+    return await get_analytics_overview(
+        category=category,
+        camera_id=camera_id,
+        min_confidence=min_confidence,
+        source=source,
+        callsign=callsign,
+        altitude_only=altitude_only,
+        since=since,
+        until=until,
+    )
+
+
+@app.get(
+    "/api/analytics/timeseries",
+    tags=["analytics"],
+    response_model=AnalyticsTimeseriesResponse,
+)
+async def analytics_timeseries(
+    category: Optional[str] = Query(default=None),
+    camera_id: Optional[str] = Query(default=None),
+    min_confidence: Optional[float] = Query(default=None, ge=0.0, le=1.0),
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
+):
+    return await get_analytics_timeseries(
+        category=category,
+        camera_id=camera_id,
+        min_confidence=min_confidence,
+        since=since,
+        until=until,
+    )
 
 
 @app.websocket("/ws/live")

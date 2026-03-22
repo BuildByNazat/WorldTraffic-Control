@@ -3,8 +3,10 @@
  */
 
 import React, { useEffect, useMemo, useState } from "react";
+import AnalyticsDashboard from "./AnalyticsDashboard";
 import HistoryFilters from "./HistoryFilters";
 import ReplayControls from "./ReplayControls";
+import { useAnalytics } from "../hooks/useAnalytics";
 import type {
   AircraftRecord,
   DetectionRecord,
@@ -14,7 +16,7 @@ import type { FilteredHistoryState } from "../hooks/useFilteredHistory";
 import { useReplay } from "../hooks/useReplay";
 import type { SelectedEventDetail, SelectedHistoryDetail } from "../types/selectedEvent";
 
-type HistoryTab = "summary" | "detections" | "aircraft";
+type HistoryTab = "analytics" | "summary" | "detections" | "aircraft";
 
 interface HistoryPanelProps {
   feed: HistoryFeedState;
@@ -356,7 +358,8 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
   onSelectEvent,
   selectedEvent,
 }) => {
-  const [tab, setTab] = useState<HistoryTab>("summary");
+  const [tab, setTab] = useState<HistoryTab>("analytics");
+  const analytics = useAnalytics(true, filters.filters);
   const replayEvents = useMemo(() => {
     const detectionEvents = feed.detections.map((detection) => ({
       eventKey: `detection:${detection.id}`,
@@ -450,7 +453,10 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
         </div>
         <button
           className="history-panel__refresh"
-          onClick={feed.refresh}
+          onClick={() => {
+            feed.refresh();
+            analytics.refresh();
+          }}
           disabled={feed.loading}
           title="Refresh history data"
           aria-label="Refresh history"
@@ -460,7 +466,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
       </div>
 
       <div className="history-tabs" role="tablist">
-        {(["summary", "detections", "aircraft"] as HistoryTab[]).map((nextTab) => (
+        {(["analytics", "summary", "detections", "aircraft"] as HistoryTab[]).map((nextTab) => (
           <button
             key={nextTab}
             className={`history-tab${tab === nextTab ? " history-tab--active" : ""}`}
@@ -468,7 +474,9 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
             aria-selected={tab === nextTab}
             onClick={() => setTab(nextTab)}
           >
-            {nextTab === "summary"
+            {nextTab === "analytics"
+              ? "Analytics"
+              : nextTab === "summary"
               ? "Summary"
               : nextTab === "detections"
                 ? "Detections"
@@ -508,6 +516,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
       />
 
       <div className="history-panel__content">
+        {tab === "analytics" && <AnalyticsDashboard analytics={analytics} />}
         {tab === "summary" && (
           <SummaryTab
             summary={feed.summary}

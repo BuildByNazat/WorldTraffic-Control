@@ -10,7 +10,7 @@ logged and swallowed so a DB write can never crash the live pipeline.
 
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Literal, Optional, Tuple
 
 from sqlalchemy import func, select
 
@@ -210,3 +210,38 @@ async def get_latest_detection_time(
     except Exception:
         logger.exception("Failed to get latest detection time.")
         return None
+
+
+async def get_detection_timeseries(
+    *,
+    bucket_unit: Literal["hour", "day"],
+    category: Optional[str] = None,
+    camera_id: Optional[str] = None,
+    min_confidence: Optional[float] = None,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+) -> List[Tuple[str, int]]:
+    """Return grouped detection counts by hour or day."""
+    bucket_format = (
+        "%Y-%m-%dT%H:00:00" if bucket_unit == "hour" else "%Y-%m-%dT00:00:00"
+    )
+    bucket_expr = func.strftime(bucket_format, CameraDetection.detected_at)
+
+    try:
+        async with async_session_factory() as session:
+            stmt = _apply_detection_filters(
+                select(bucket_expr.label("bucket_start"), func.count())
+                .select_from(CameraDetection)
+                .group_by("bucket_start")
+                .order_by("bucket_start"),
+                category=category,
+                camera_id=camera_id,
+                min_confidence=min_confidence,
+                since=since,
+                until=until,
+            )
+            result = await session.execute(stmt)
+            return [(row[0], row[1]) for row in result.all() if row[0] is not None]
+    except Exception:
+        logger.exception("Failed to query detection timeseries.")
+        return []
