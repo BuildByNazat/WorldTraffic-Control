@@ -1,18 +1,8 @@
 /**
- * LiveMap — Leaflet map rendering live aircraft positions and camera detections.
- *
- * Features:
- *   - Aircraft: rotated ✈ icon, coloured by source (simulated vs. OpenSky)
- *   - Detections: small coloured dot with category label, from Gemini analysis
- *   - Efficient in-place marker updates (no full re-render on each tick)
- *   - Clickable popups for both marker types
- *   - Optional highlightLocation: pulsing ring for history-mode selection
- *
- * Detection coordinates are APPROXIMATE (camera lat/lon + small jitter).
- * This is clearly noted in each detection popup.
+ * LiveMap - Leaflet map rendering live aircraft, detections, alerts, and selection highlights.
  */
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -22,35 +12,31 @@ import {
   type AnyFeature,
   isAircraftFeature,
 } from "../hooks/useLiveFeed";
+import type { AlertRecord } from "../hooks/useAlerts";
+import type { MapLayerState } from "../hooks/useMapLayers";
 
-// ── Fix Leaflet's default icon path broken by bundlers ────────────────────
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as L.Icon.Default & { _getIconUrl?: unknown })
+  ._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
 });
 
-// ---------------------------------------------------------------------------
-// Icon factories
-// ---------------------------------------------------------------------------
-
 function createAircraftIcon(heading: number): L.DivIcon {
   return L.divIcon({
     className: "",
-    html: `<div class="aircraft-icon" style="transform: rotate(${heading}deg)">✈</div>`,
+    html: `<div class="aircraft-icon" style="transform: rotate(${heading}deg)">*</div>`,
     iconSize: [24, 24],
     iconAnchor: [12, 12],
     popupAnchor: [0, -14],
   });
 }
 
-/** Colour map for detection categories. */
 const DETECTION_COLORS: Record<string, string> = {
   vehicle: "#f59e0b",
   pedestrian: "#3b82f6",
@@ -61,78 +47,111 @@ const DETECTION_COLORS: Record<string, string> = {
 };
 
 function createDetectionIcon(category: string): L.DivIcon {
-  const colour = DETECTION_COLORS[category] ?? DETECTION_COLORS.unknown;
+  const color = DETECTION_COLORS[category] ?? DETECTION_COLORS.unknown;
   return L.divIcon({
     className: "",
-    html: `<div class="detection-icon" style="background:${colour}" title="${category}"></div>`,
+    html: `<div class="detection-icon" style="background:${color}" title="${category}"></div>`,
     iconSize: [14, 14],
     iconAnchor: [7, 7],
     popupAnchor: [0, -10],
   });
 }
 
-// ---------------------------------------------------------------------------
-// Popup builders
-// ---------------------------------------------------------------------------
+function createAlertIcon(
+  severity: AlertRecord["severity"],
+  selected: boolean
+): L.DivIcon {
+  const color =
+    severity === "high"
+      ? "#f85149"
+      : severity === "medium"
+        ? "#d29922"
+        : "#58a6ff";
 
-function buildAircraftPopup(f: AnyFeature): string {
-  if (!isAircraftFeature(f)) return "";
-  const p = f.properties;
+  return L.divIcon({
+    className: "",
+    html: `<div class="alert-marker${
+      selected ? " alert-marker--selected" : ""
+    }" style="--alert-color:${color}"></div>`,
+    iconSize: selected ? [18, 18] : [14, 14],
+    iconAnchor: selected ? [9, 9] : [7, 7],
+    popupAnchor: [0, -10],
+  });
+}
+
+function buildAircraftPopup(feature: AnyFeature): string {
+  if (!isAircraftFeature(feature)) return "";
+  const properties = feature.properties;
   return `
     <div class="aircraft-popup">
-      <h3>✈ ${p.callsign}</h3>
+      <h3>${properties.callsign}</h3>
       <table>
-        <tr><td>ID</td><td>${p.id}</td></tr>
-        <tr><td>Altitude</td><td>${p.altitude.toLocaleString()} ft</td></tr>
-        <tr><td>Heading</td><td>${p.heading}°</td></tr>
-        <tr><td>Speed</td><td>${p.speed} kts</td></tr>
-        <tr><td>Source</td><td>${p.source}</td></tr>
+        <tr><td>ID</td><td>${properties.id}</td></tr>
+        <tr><td>Altitude</td><td>${properties.altitude.toLocaleString()} ft</td></tr>
+        <tr><td>Heading</td><td>${properties.heading} deg</td></tr>
+        <tr><td>Speed</td><td>${properties.speed} kt</td></tr>
+        <tr><td>Source</td><td>${properties.source}</td></tr>
       </table>
     </div>
   `;
 }
 
-function buildDetectionPopup(f: AnyFeature): string {
-  if (isAircraftFeature(f)) return "";
-  const p = f.properties;
-  const confidence = (p.confidence * 100).toFixed(0);
-  const time = p.detected_at
-    ? new Date(p.detected_at).toLocaleTimeString()
-    : "—";
+function buildDetectionPopup(feature: AnyFeature): string {
+  if (isAircraftFeature(feature)) return "";
+  const properties = feature.properties;
+  const confidence = (properties.confidence * 100).toFixed(0);
+  const time = properties.detected_at
+    ? new Date(properties.detected_at).toLocaleTimeString()
+    : "-";
   return `
     <div class="detection-popup">
-      <h3>📷 ${p.label}</h3>
+      <h3>${properties.label}</h3>
       <table>
-        <tr><td>Category</td><td>${p.category}</td></tr>
+        <tr><td>Category</td><td>${properties.category}</td></tr>
         <tr><td>Confidence</td><td>${confidence}%</td></tr>
-        <tr><td>Camera</td><td>${p.camera_id}</td></tr>
-        <tr><td>Detected at</td><td>${time}</td></tr>
+        <tr><td>Camera</td><td>${properties.camera_id}</td></tr>
+        <tr><td>Detected</td><td>${time}</td></tr>
       </table>
-      <p class="detection-popup__note">
-        ⚠️ Position is approximate (camera location only)
-      </p>
+      <p class="detection-popup__note">Position is approximate to the camera location.</p>
     </div>
   `;
 }
 
-// ---------------------------------------------------------------------------
-// Inner component: syncs live markers
-// ---------------------------------------------------------------------------
-
-interface MarkersLayerProps {
-  data: CombinedFeatureCollection | null;
+function buildAlertPopup(alert: AlertRecord): string {
+  return `
+    <div class="aircraft-popup">
+      <h3>${alert.title}</h3>
+      <table>
+        <tr><td>Category</td><td>${alert.category}</td></tr>
+        <tr><td>Severity</td><td>${alert.severity}</td></tr>
+        <tr><td>Status</td><td>${alert.status}</td></tr>
+        <tr><td>Camera</td><td>${alert.camera_id ?? "-"}</td></tr>
+      </table>
+    </div>
+  `;
 }
 
-function MarkersLayer({ data }: MarkersLayerProps) {
+interface LiveMarkersLayerProps {
+  data: CombinedFeatureCollection | null;
+  layers: MapLayerState;
+}
+
+function LiveMarkersLayer({ data, layers }: LiveMarkersLayerProps) {
   const map = useMap();
   const markerMap = useRef<Map<string, L.Marker>>(new Map());
 
   useEffect(() => {
-    if (!data) return;
+    const visibleFeatures =
+      data?.features.filter((feature) =>
+        isAircraftFeature(feature) ? layers.showAircraft : layers.showDetections
+      ) ?? [];
 
-    const incoming = new Set(data.features.map((f) => f.properties.id));
+    const incoming = new Set(
+      visibleFeatures.map((feature) =>
+        `${isAircraftFeature(feature) ? "aircraft" : "detection"}:${feature.properties.id}`
+      )
+    );
 
-    // Remove stale markers
     markerMap.current.forEach((marker, id) => {
       if (!incoming.has(id)) {
         marker.remove();
@@ -140,9 +159,8 @@ function MarkersLayer({ data }: MarkersLayerProps) {
       }
     });
 
-    // Add or update markers
-    data.features.forEach((feature) => {
-      const id = feature.properties.id;
+    visibleFeatures.forEach((feature) => {
+      const markerId = `${isAircraftFeature(feature) ? "aircraft" : "detection"}:${feature.properties.id}`;
       const [lon, lat] = feature.geometry.coordinates;
 
       const icon = isAircraftFeature(feature)
@@ -153,23 +171,21 @@ function MarkersLayer({ data }: MarkersLayerProps) {
         ? buildAircraftPopup(feature)
         : buildDetectionPopup(feature);
 
-      const existing = markerMap.current.get(id);
+      const existing = markerMap.current.get(markerId);
       if (existing) {
         existing.setLatLng([lat, lon]);
         existing.setIcon(icon);
         existing.setPopupContent(popup);
       } else {
-        const marker = L.marker([lat, lon], { icon })
-          .addTo(map)
-          .bindPopup(popup);
-        markerMap.current.set(id, marker);
+        const marker = L.marker([lat, lon], { icon }).addTo(map).bindPopup(popup);
+        markerMap.current.set(markerId, marker);
       }
     });
-  }, [data, map]);
+  }, [data, layers.showAircraft, layers.showDetections, map]);
 
   useEffect(() => {
     return () => {
-      markerMap.current.forEach((m) => m.remove());
+      markerMap.current.forEach((marker) => marker.remove());
       markerMap.current.clear();
     };
   }, []);
@@ -177,9 +193,65 @@ function MarkersLayer({ data }: MarkersLayerProps) {
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Inner component: history highlight marker (pulsing yellow ring)
-// ---------------------------------------------------------------------------
+interface AlertMarkersLayerProps {
+  alerts: AlertRecord[];
+  layers: MapLayerState;
+  selectedAlertId: string | null;
+  onSelectAlert: (alert: AlertRecord) => void;
+}
+
+function AlertMarkersLayer({
+  alerts,
+  layers,
+  selectedAlertId,
+  onSelectAlert,
+}: AlertMarkersLayerProps) {
+  const map = useMap();
+  const markerMap = useRef<Map<string, L.Marker>>(new Map());
+
+  const visibleAlerts = useMemo(() => {
+    if (!layers.showAlerts) return [];
+    return alerts.filter((alert) =>
+      layers.openAlertsOnly ? alert.status !== "resolved" : true
+    );
+  }, [alerts, layers.openAlertsOnly, layers.showAlerts]);
+
+  useEffect(() => {
+    const incoming = new Set(visibleAlerts.map((alert) => alert.id));
+
+    markerMap.current.forEach((marker, id) => {
+      if (!incoming.has(id)) {
+        marker.remove();
+        markerMap.current.delete(id);
+      }
+    });
+
+    visibleAlerts.forEach((alert) => {
+      const icon = createAlertIcon(alert.severity, selectedAlertId === alert.id);
+      const existing = markerMap.current.get(alert.id);
+      if (existing) {
+        existing.setLatLng([alert.latitude, alert.longitude]);
+        existing.setIcon(icon);
+        existing.setPopupContent(buildAlertPopup(alert));
+      } else {
+        const marker = L.marker([alert.latitude, alert.longitude], { icon })
+          .addTo(map)
+          .bindPopup(buildAlertPopup(alert));
+        marker.on("click", () => onSelectAlert(alert));
+        markerMap.current.set(alert.id, marker);
+      }
+    });
+  }, [map, onSelectAlert, selectedAlertId, visibleAlerts]);
+
+  useEffect(() => {
+    return () => {
+      markerMap.current.forEach((marker) => marker.remove());
+      markerMap.current.clear();
+    };
+  }, []);
+
+  return null;
+}
 
 export interface HighlightLocation {
   lat: number;
@@ -187,66 +259,84 @@ export interface HighlightLocation {
   label: string;
 }
 
+type HighlightVariant = "replay" | "selected" | null;
+
 interface HighlightLayerProps {
   location: HighlightLocation | null;
+  variant: HighlightVariant;
+  enabled: boolean;
 }
 
-function HighlightLayer({ location }: HighlightLayerProps) {
+function HighlightLayer({ location, variant, enabled }: HighlightLayerProps) {
   const map = useMap();
   const circleRef = useRef<L.CircleMarker | null>(null);
 
   useEffect(() => {
-    // Remove previous highlight
     if (circleRef.current) {
       circleRef.current.remove();
       circleRef.current = null;
     }
 
-    if (!location) return;
+    if (!location || !variant || !enabled) return;
 
-    const { lat, lon, label } = location;
+    const color = variant === "replay" ? "#38bdf8" : "#facc15";
+    const subtitle = variant === "replay" ? "Replay selection" : "Selected event";
 
-    const circle = L.circleMarker([lat, lon], {
-      radius: 14,
-      color: "#facc15",
+    const circle = L.circleMarker([location.lat, location.lon], {
+      radius: variant === "replay" ? 13 : 14,
+      color,
       weight: 3,
       opacity: 1,
-      fillColor: "#facc15",
+      fillColor: color,
       fillOpacity: 0.18,
       className: "highlight-ring",
     })
       .addTo(map)
       .bindPopup(
-        `<div class="aircraft-popup"><h3>${label}</h3>` +
-          `<p style="font-size:0.75rem;color:#8b949e;margin-top:4px">History selection</p></div>`
+        `<div class="aircraft-popup"><h3>${location.label}</h3><p style="font-size:0.75rem;color:#8b949e;margin-top:4px">${subtitle}</p></div>`
       )
       .openPopup();
 
     circleRef.current = circle;
-
-    // Fly to the selected point
-    map.flyTo([lat, lon], Math.max(map.getZoom(), 7), { duration: 1.2 });
+    map.flyTo([location.lat, location.lon], Math.max(map.getZoom(), 7), {
+      duration: 1.2,
+    });
 
     return () => {
       circle.remove();
       circleRef.current = null;
     };
-  }, [location, map]);
+  }, [enabled, location, map, variant]);
 
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Exported component
-// ---------------------------------------------------------------------------
-
 export interface LiveMapProps {
   data: CombinedFeatureCollection | null;
-  /** When set, drops a yellow highlight ring on this coordinate (history mode). */
+  alerts: AlertRecord[];
+  layerState: MapLayerState;
   highlightLocation?: HighlightLocation | null;
+  highlightVariant?: HighlightVariant;
+  selectedAlertId?: string | null;
+  onSelectAlert: (alert: AlertRecord) => void;
 }
 
-const LiveMap: React.FC<LiveMapProps> = ({ data, highlightLocation }) => {
+const LiveMap: React.FC<LiveMapProps> = ({
+  data,
+  alerts,
+  layerState,
+  highlightLocation,
+  highlightVariant = null,
+  selectedAlertId = null,
+  onSelectAlert,
+}) => {
+  const highlightEnabled =
+    highlightVariant === "replay"
+      ? layerState.showReplayHighlight
+      : highlightVariant === "selected"
+        ? layerState.showSelectedHighlight
+        : false;
+
   return (
     <MapContainer
       className="map-container"
@@ -256,13 +346,22 @@ const LiveMap: React.FC<LiveMapProps> = ({ data, highlightLocation }) => {
       maxZoom={18}
       worldCopyJump
     >
-      {/* OpenStreetMap tiles — free, no API key required */}
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <MarkersLayer data={data} />
-      <HighlightLayer location={highlightLocation ?? null} />
+      <LiveMarkersLayer data={data} layers={layerState} />
+      <AlertMarkersLayer
+        alerts={alerts}
+        layers={layerState}
+        selectedAlertId={selectedAlertId}
+        onSelectAlert={onSelectAlert}
+      />
+      <HighlightLayer
+        location={highlightLocation ?? null}
+        variant={highlightVariant}
+        enabled={highlightEnabled}
+      />
     </MapContainer>
   );
 };

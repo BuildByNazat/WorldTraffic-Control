@@ -18,10 +18,12 @@ import type { AppMode } from "./components/ModeToggle";
 import HistoryPanel from "./components/HistoryPanel";
 import AlertsPanel from "./components/AlertsPanel";
 import EventDetailDrawer from "./components/EventDetailDrawer";
+import LayerControls from "./components/LayerControls";
 import { useLiveFeed, isAircraftFeature } from "./hooks/useLiveFeed";
 import { useFilteredHistory } from "./hooks/useFilteredHistory";
 import { useHistoryFeed } from "./hooks/useHistoryFeed";
 import { useAlerts, type AlertRecord } from "./hooks/useAlerts";
+import { useMapLayers } from "./hooks/useMapLayers";
 import type {
   SelectedAlertDetail,
   SelectedEventDetail,
@@ -38,6 +40,7 @@ const App: React.FC = () => {
   const historyFilters = useFilteredHistory();
   const historyFeed = useHistoryFeed(mode === "history", historyFilters.filters);
   const alertsState = useAlerts(true);
+  const mapLayers = useMapLayers();
 
   const aircraftCount = data?.features.filter(isAircraftFeature).length ?? 0;
   const detectionCount =
@@ -100,13 +103,32 @@ const App: React.FC = () => {
       </header>
 
       <main className="app-content">
-        <LiveMap data={data} highlightLocation={highlight} />
+        <LiveMap
+          data={data}
+          alerts={alertsState.alerts}
+          layerState={mapLayers.layers}
+          highlightLocation={highlight}
+          highlightVariant={
+            selectedEvent?.kind === "history"
+              ? "replay"
+              : selectedEvent?.kind === "alert"
+                ? "selected"
+                : null
+          }
+          selectedAlertId={selectedEvent?.kind === "alert" ? selectedEvent.id : null}
+          onSelectAlert={handleSelectAlert}
+        />
 
         <StatusPanel
           status={status}
           aircraftCount={aircraftCount}
           detectionCount={detectionCount}
           lastUpdate={lastUpdate}
+        />
+
+        <LayerControls
+          layers={mapLayers.layers}
+          onToggleLayer={mapLayers.toggleLayer}
         />
 
         <AlertsPanel
