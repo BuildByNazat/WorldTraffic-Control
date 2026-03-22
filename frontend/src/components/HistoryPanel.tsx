@@ -10,10 +10,12 @@
  * can fly to that coordinate.
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import HistoryFilters from "./HistoryFilters";
+import ReplayControls from "./ReplayControls";
 import type { AircraftRecord, HistoryFeedState } from "../hooks/useHistoryFeed";
 import type { FilteredHistoryState } from "../hooks/useFilteredHistory";
+import { useReplay } from "../hooks/useReplay";
 
 export interface SelectedLocation {
   lat: number;
@@ -171,13 +173,13 @@ function LoadMoreFooter({
 
 function DetectionsTab({
   feed,
-  onSelect,
-  selectedId,
+  onSelectEvent,
+  selectedReplayKey,
   hasActiveFilters,
 }: {
   feed: HistoryFeedState;
-  onSelect: (loc: SelectedLocation | null) => void;
-  selectedId: string | null;
+  onSelectEvent: (eventKey: string, loc: SelectedLocation) => void;
+  selectedReplayKey: string | null;
   hasActiveFilters: boolean;
 }) {
   if (feed.loading) return <div className="history-empty">Loading detections…</div>;
@@ -201,23 +203,20 @@ function DetectionsTab({
   return (
     <div className="history-list">
       {feed.detections.map((detection) => {
-        const isSelected = selectedId === detection.feature_id;
+        const replayKey = `detection:${detection.id}`;
+        const isSelected = selectedReplayKey === replayKey;
 
         return (
           <button
             key={detection.id}
             className={`history-item${isSelected ? " history-item--selected" : ""}`}
             onClick={() =>
-              onSelect(
-                isSelected
-                  ? null
-                  : {
-                      lat: detection.latitude,
-                      lon: detection.longitude,
-                      label: detection.label,
-                      featureId: detection.feature_id,
-                    }
-              )
+              onSelectEvent(replayKey, {
+                lat: detection.latitude,
+                lon: detection.longitude,
+                label: detection.label,
+                featureId: detection.feature_id,
+              })
             }
             aria-pressed={isSelected}
           >
@@ -251,13 +250,13 @@ function DetectionsTab({
 
 function AircraftTab({
   feed,
-  onSelect,
-  selectedId,
+  onSelectEvent,
+  selectedReplayKey,
   hasActiveFilters,
 }: {
   feed: HistoryFeedState;
-  onSelect: (loc: SelectedLocation | null) => void;
-  selectedId: string | null;
+  onSelectEvent: (eventKey: string, loc: SelectedLocation) => void;
+  selectedReplayKey: string | null;
   hasActiveFilters: boolean;
 }) {
   if (feed.loading) return <div className="history-empty">Loading aircraft logs…</div>;
@@ -281,7 +280,8 @@ function AircraftTab({
   return (
     <div className="history-list">
       {feed.aircraft.map((record: AircraftRecord) => {
-        const isSelected = selectedId === record.feature_id;
+        const replayKey = `aircraft:${record.id}`;
+        const isSelected = selectedReplayKey === replayKey;
         const label = record.callsign ?? record.feature_id;
 
         return (
@@ -289,16 +289,12 @@ function AircraftTab({
             key={record.id}
             className={`history-item${isSelected ? " history-item--selected" : ""}`}
             onClick={() =>
-              onSelect(
-                isSelected
-                  ? null
-                  : {
-                      lat: record.latitude,
-                      lon: record.longitude,
-                      label,
-                      featureId: record.feature_id,
-                    }
-              )
+              onSelectEvent(replayKey, {
+                lat: record.latitude,
+                lon: record.longitude,
+                label,
+                featureId: record.feature_id,
+              })
             }
             aria-pressed={isSelected}
           >
@@ -337,6 +333,34 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
   selectedFeatureId,
 }) => {
   const [tab, setTab] = useState<HistoryTab>("summary");
+  const replayEvents = useMemo(() => {
+    const detectionEvents = feed.detections.map((detection) => ({
+      eventKey: `detection:${detection.id}`,
+      featureId: detection.feature_id,
+      timestamp: detection.detected_at,
+      label: detection.label,
+      typeLabel: "Detection" as const,
+      lat: detection.latitude,
+      lon: detection.longitude,
+    }));
+
+    const aircraftEvents = feed.aircraft.map((record) => ({
+      eventKey: `aircraft:${record.id}`,
+      featureId: record.feature_id,
+      timestamp: record.observed_at,
+      label: record.callsign ?? record.feature_id,
+      typeLabel: "Aircraft" as const,
+      lat: record.latitude,
+      lon: record.longitude,
+    }));
+
+    return [...detectionEvents, ...aircraftEvents].sort(
+      (a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+  }, [feed.aircraft, feed.detections]);
+
+  const replay = useReplay(replayEvents);
 
   useEffect(() => {
     if (!selectedFeatureId) return;
@@ -349,6 +373,30 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
       onSelectLocation(null);
     }
   }, [feed.aircraft, feed.detections, onSelectLocation, selectedFeatureId]);
+
+  useEffect(() => {
+    if (!replay.currentEvent) {
+      onSelectLocation(null);
+      return;
+    }
+
+    onSelectLocation({
+      lat: replay.currentEvent.lat,
+      lon: replay.currentEvent.lon,
+      label: replay.currentEvent.label,
+      featureId: replay.currentEvent.featureId,
+    });
+  }, [onSelectLocation, replay.currentEvent]);
+
+  function handleReplayListSelection(eventKey: string, loc: SelectedLocation) {
+    if (replay.currentEvent?.eventKey === eventKey) {
+      replay.clearSelection();
+      return;
+    }
+
+    replay.selectEvent(eventKey);
+    onSelectLocation(loc);
+  }
 
   return (
     <div className="history-panel" role="complementary" aria-label="History panel">
@@ -399,6 +447,20 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
         disabled={feed.loading}
       />
 
+      <ReplayControls
+        hasEvents={replay.hasEvents}
+        isPlaying={replay.isPlaying}
+        currentIndex={replay.currentIndex}
+        totalEvents={replayEvents.length}
+        currentEvent={replay.currentEvent}
+        playbackSpeed={replay.playbackSpeed}
+        onTogglePlayback={replay.togglePlayback}
+        onPrevious={replay.goToPrevious}
+        onNext={replay.goToNext}
+        onScrub={replay.scrubTo}
+        onPlaybackSpeedChange={replay.setPlaybackSpeed}
+      />
+
       <div className="history-panel__content">
         {tab === "summary" && (
           <SummaryTab
@@ -411,16 +473,16 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
         {tab === "detections" && (
           <DetectionsTab
             feed={feed}
-            onSelect={onSelectLocation}
-            selectedId={selectedFeatureId}
+            onSelectEvent={handleReplayListSelection}
+            selectedReplayKey={replay.currentEvent?.eventKey ?? null}
             hasActiveFilters={filters.hasActiveFilters}
           />
         )}
         {tab === "aircraft" && (
           <AircraftTab
             feed={feed}
-            onSelect={onSelectLocation}
-            selectedId={selectedFeatureId}
+            onSelectEvent={handleReplayListSelection}
+            selectedReplayKey={replay.currentEvent?.eventKey ?? null}
             hasActiveFilters={filters.hasActiveFilters}
           />
         )}

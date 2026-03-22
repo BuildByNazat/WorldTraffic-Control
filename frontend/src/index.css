@@ -452,6 +452,109 @@ body {
   flex-direction: column;
 }
 
+.history-replay {
+  padding: 12px 16px 14px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  flex-shrink: 0;
+}
+
+.history-replay--empty {
+  gap: 8px;
+}
+
+.history-replay__header,
+.history-replay__meta,
+.history-replay__main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.history-replay__order,
+.history-replay__position,
+.history-replay__timestamp,
+.history-replay__empty {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.history-replay__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-replay__button {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.74rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.history-replay__button:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: rgba(88, 166, 255, 0.08);
+}
+
+.history-replay__button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.history-replay__button--primary {
+  border-color: rgba(88, 166, 255, 0.4);
+}
+
+.history-replay__speed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.history-replay__speed select {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.74rem;
+}
+
+.history-replay__slider {
+  width: 100%;
+  accent-color: var(--color-accent);
+}
+
+.history-replay__event {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.history-replay__event-type {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.history-replay__event-label {
+  font-size: 0.8rem;
+  color: var(--color-text);
+}
+
 .history-filters {
   padding: 12px 16px 14px;
   border-bottom: 1px solid var(--color-border);
