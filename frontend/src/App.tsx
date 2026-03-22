@@ -31,7 +31,7 @@ const App: React.FC = () => {
 
   const historyFilters = useFilteredHistory();
   const historyFeed = useHistoryFeed(mode === "history", historyFilters.filters);
-  const alertsState = useAlerts(mode === "history");
+  const alertsState = useAlerts(true);
 
   const aircraftCount = data?.features.filter(isAircraftFeature).length ?? 0;
   const detectionCount =
@@ -81,16 +81,19 @@ const App: React.FC = () => {
           lastUpdate={lastUpdate}
         />
 
+        <AlertsPanel
+          alertsState={alertsState}
+          onSelectAlert={handleSelectAlert}
+          variant={mode === "live" ? "compact" : "full"}
+        />
+
         {mode === "history" && (
-          <>
-            <AlertsPanel alertsState={alertsState} onSelectAlert={handleSelectAlert} />
-            <HistoryPanel
-              feed={historyFeed}
-              filters={historyFilters}
-              onSelectLocation={handleSelectLocation}
-              selectedFeatureId={selectedId}
-            />
-          </>
+          <HistoryPanel
+            feed={historyFeed}
+            filters={historyFilters}
+            onSelectLocation={handleSelectLocation}
+            selectedFeatureId={selectedId}
+          />
         )}
       </main>
     </div>

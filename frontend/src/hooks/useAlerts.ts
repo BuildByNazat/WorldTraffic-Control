@@ -31,9 +31,19 @@ export interface AlertsState {
   summary: AlertsSummary | null;
   loading: boolean;
   error: string | null;
+  newestAlertNotice: AlertRecord | null;
   refresh: () => void;
   acknowledge: (id: string) => Promise<void>;
   resolve: (id: string) => Promise<void>;
+  dismissNewAlertNotice: () => void;
+}
+
+const ALERT_POLL_INTERVAL_MS = 20000;
+
+function statusRank(status: AlertRecord["status"]): number {
+  if (status === "new") return 0;
+  if (status === "acknowledged") return 1;
+  return 2;
 }
 
 export function useAlerts(enabled: boolean): AlertsState {
@@ -41,7 +51,10 @@ export function useAlerts(enabled: boolean): AlertsState {
   const [summary, setSummary] = useState<AlertsSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [newestAlertNotice, setNewestAlertNotice] = useState<AlertRecord | null>(null);
   const isMounted = useRef(true);
+  const hasLoadedOnce = useRef(false);
+  const seenAlertIds = useRef<Set<string>>(new Set());
 
   const refresh = useCallback(async () => {
     if (!enabled || !isMounted.current) return;
@@ -65,7 +78,28 @@ export function useAlerts(enabled: boolean): AlertsState {
       ]);
 
       if (!isMounted.current) return;
-      setAlerts(alertsData.alerts);
+
+      const sortedAlerts = [...alertsData.alerts].sort((a, b) => {
+        const statusDiff = statusRank(a.status) - statusRank(b.status);
+        if (statusDiff !== 0) return statusDiff;
+        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      });
+
+      if (!hasLoadedOnce.current) {
+        sortedAlerts.forEach((alert) => seenAlertIds.current.add(alert.id));
+        hasLoadedOnce.current = true;
+      } else {
+        const newOpenAlert = sortedAlerts.find(
+          (alert) =>
+            !seenAlertIds.current.has(alert.id) && alert.status !== "resolved"
+        );
+        sortedAlerts.forEach((alert) => seenAlertIds.current.add(alert.id));
+        if (newOpenAlert) {
+          setNewestAlertNotice(newOpenAlert);
+        }
+      }
+
+      setAlerts(sortedAlerts);
       setSummary(summaryData);
     } catch (err) {
       if (!isMounted.current) return;
@@ -78,9 +112,16 @@ export function useAlerts(enabled: boolean): AlertsState {
   }, [enabled]);
 
   useEffect(() => {
-    if (enabled) {
+    if (!enabled) return;
+    void refresh();
+
+    const interval = window.setInterval(() => {
       void refresh();
-    }
+    }, ALERT_POLL_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(interval);
+    };
   }, [enabled, refresh]);
 
   useEffect(() => {
@@ -115,8 +156,10 @@ export function useAlerts(enabled: boolean): AlertsState {
     summary,
     loading,
     error,
+    newestAlertNotice,
     refresh,
     acknowledge: (id: string) => updateAlert(id, "acknowledge"),
     resolve: (id: string) => updateAlert(id, "resolve"),
+    dismissNewAlertNotice: () => setNewestAlertNotice(null),
   };
 }

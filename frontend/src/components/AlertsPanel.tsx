@@ -4,6 +4,7 @@ import type { AlertRecord, AlertsState } from "../hooks/useAlerts";
 interface AlertsPanelProps {
   alertsState: AlertsState;
   onSelectAlert: (alert: AlertRecord) => void;
+  variant?: "full" | "compact";
 }
 
 function formatTime(value: string): string {
@@ -17,13 +18,24 @@ function formatTime(value: string): string {
   });
 }
 
-const AlertsPanel: React.FC<AlertsPanelProps> = ({ alertsState, onSelectAlert }) => {
-  const { alerts, summary, loading, error, acknowledge, resolve } = alertsState;
+const AlertsPanel: React.FC<AlertsPanelProps> = ({
+  alertsState,
+  onSelectAlert,
+  variant = "full",
+}) => {
+  const { alerts, summary, loading, error, acknowledge, resolve, newestAlertNotice } =
+    alertsState;
+  const visibleAlerts = variant === "compact" ? alerts.slice(0, 4) : alerts;
 
   return (
-    <aside className="alerts-panel" aria-label="Alerts panel">
+    <aside
+      className={`alerts-panel${variant === "compact" ? " alerts-panel--compact" : ""}`}
+      aria-label="Alerts panel"
+    >
       <div className="alerts-panel__header">
-        <span className="alerts-panel__title">Alerts</span>
+        <span className="alerts-panel__title">
+          {variant === "compact" ? "Live Alerts" : "Alerts"}
+        </span>
         <button
           type="button"
           className="alerts-panel__refresh"
@@ -33,6 +45,20 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({ alertsState, onSelectAlert })
           {loading ? "…" : "↻"}
         </button>
       </div>
+
+      {newestAlertNotice && variant === "compact" && (
+        <button
+          type="button"
+          className="alerts-toast"
+          onClick={() => {
+            onSelectAlert(newestAlertNotice);
+            alertsState.dismissNewAlertNotice();
+          }}
+        >
+          <span className="alerts-toast__label">New alert</span>
+          <span className="alerts-toast__title">{newestAlertNotice.title}</span>
+        </button>
+      )}
 
       {summary && (
         <div className="alerts-summary">
@@ -47,25 +73,34 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({ alertsState, onSelectAlert })
               </span>
             ))}
           </div>
-          <div className="alerts-summary__group">
-            {Object.entries(summary.alerts_by_category).map(([category, count]) => (
-              <span key={category} className="alerts-summary__chip">
-                {category}: {count}
-              </span>
-            ))}
-          </div>
+          {variant === "full" && (
+            <div className="alerts-summary__group">
+              {Object.entries(summary.alerts_by_category).map(([category, count]) => (
+                <span key={category} className="alerts-summary__chip">
+                  {category}: {count}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {error && <div className="alerts-panel__error">{error}</div>}
 
       {!loading && alerts.length === 0 && (
-        <div className="alerts-panel__empty">No active alerts derived from recent detections.</div>
+        <div className="alerts-panel__empty">
+          {variant === "compact"
+            ? "No open live alerts."
+            : "No active alerts derived from recent detections."}
+        </div>
       )}
 
       <div className="alerts-list">
-        {alerts.map((alert) => (
-          <div key={alert.id} className={`alert-card alert-card--${alert.severity}`}>
+        {visibleAlerts.map((alert) => (
+          <div
+            key={alert.id}
+            className={`alert-card alert-card--${alert.severity} alert-card--status-${alert.status}`}
+          >
             <button
               type="button"
               className="alert-card__body"
@@ -85,24 +120,26 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({ alertsState, onSelectAlert })
               </div>
             </button>
 
-            <div className="alert-card__actions">
-              <button
-                type="button"
-                className="alert-card__action"
-                onClick={() => void acknowledge(alert.id)}
-                disabled={alert.status !== "new"}
-              >
-                Ack
-              </button>
-              <button
-                type="button"
-                className="alert-card__action"
-                onClick={() => void resolve(alert.id)}
-                disabled={alert.status === "resolved"}
-              >
-                Resolve
-              </button>
-            </div>
+            {variant === "full" && (
+              <div className="alert-card__actions">
+                <button
+                  type="button"
+                  className="alert-card__action"
+                  onClick={() => void acknowledge(alert.id)}
+                  disabled={alert.status !== "new"}
+                >
+                  Ack
+                </button>
+                <button
+                  type="button"
+                  className="alert-card__action"
+                  onClick={() => void resolve(alert.id)}
+                  disabled={alert.status === "resolved"}
+                >
+                  Resolve
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>
