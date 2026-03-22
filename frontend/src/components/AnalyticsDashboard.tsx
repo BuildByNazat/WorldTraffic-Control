@@ -1,5 +1,6 @@
 import React from "react";
 import type { AnalyticsState, AnalyticsTimeseriesPoint } from "../hooks/useAnalytics";
+import { downloadCsv, downloadJson } from "../utils/export";
 
 interface AnalyticsDashboardProps {
   analytics: AnalyticsState;
@@ -61,31 +62,71 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ analytics }) =>
     return <div className="history-empty">No analytics are available for this view.</div>;
   }
 
-  const detectionCategories = Object.entries(overview.detections_by_category).sort(
+  const currentOverview = overview;
+  const detectionCategories = Object.entries(currentOverview.detections_by_category).sort(
     (a, b) => b[1] - a[1]
   );
-  const incidentStatuses = Object.entries(overview.incidents_by_status).sort((a, b) =>
+  const incidentStatuses = Object.entries(currentOverview.incidents_by_status).sort((a, b) =>
     a[0].localeCompare(b[0])
   );
 
+  function handleExportSummaryCsv() {
+    downloadCsv("worldtraffic-analytics-summary.csv", [
+      {
+        total_detections: currentOverview.total_detections,
+        total_aircraft_observations: currentOverview.total_aircraft_observations,
+        open_alerts_count: currentOverview.open_alerts_count,
+        incidents_by_status: JSON.stringify(currentOverview.incidents_by_status),
+        detections_by_category: JSON.stringify(currentOverview.detections_by_category),
+      },
+    ]);
+  }
+
+  function handleExportJson() {
+    downloadJson("worldtraffic-analytics.json", {
+      overview: currentOverview,
+      timeseries,
+    });
+  }
+
   return (
     <div className="analytics-panel">
+      <div className="panel-toolbar panel-toolbar--analytics">
+        <div className="panel-toolbar__meta">Current history filters applied</div>
+        <div className="panel-toolbar__actions">
+          <button
+            type="button"
+            className="panel-action"
+            onClick={handleExportSummaryCsv}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className="panel-action"
+            onClick={handleExportJson}
+          >
+            Export JSON
+          </button>
+        </div>
+      </div>
+
       <div className="analytics-grid">
         <div className="analytics-card">
           <span className="analytics-card__value">
-            {overview.total_detections.toLocaleString()}
+            {currentOverview.total_detections.toLocaleString()}
           </span>
           <span className="analytics-card__label">Detections</span>
         </div>
         <div className="analytics-card">
           <span className="analytics-card__value">
-            {overview.total_aircraft_observations.toLocaleString()}
+            {currentOverview.total_aircraft_observations.toLocaleString()}
           </span>
           <span className="analytics-card__label">Aircraft observations</span>
         </div>
         <div className="analytics-card">
           <span className="analytics-card__value">
-            {overview.open_alerts_count.toLocaleString()}
+            {currentOverview.open_alerts_count.toLocaleString()}
           </span>
           <span className="analytics-card__label">Open alerts</span>
         </div>

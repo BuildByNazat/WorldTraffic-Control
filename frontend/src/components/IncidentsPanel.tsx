@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { IncidentsState, IncidentRecord } from "../hooks/useIncidents";
+import { downloadCsv } from "../utils/export";
 
 interface IncidentsPanelProps {
   incidentsState: IncidentsState;
@@ -26,6 +27,7 @@ const IncidentsPanel: React.FC<IncidentsPanelProps> = ({
   const { incidents, loading, error, refresh, updateNote, updateStatus } =
     incidentsState;
   const [draftNotes, setDraftNotes] = useState<Record<string, string>>({});
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     setDraftNotes(
@@ -35,6 +37,47 @@ const IncidentsPanel: React.FC<IncidentsPanelProps> = ({
       }, {})
     );
   }, [incidents]);
+
+  const filteredIncidents = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return incidents;
+    }
+
+    return incidents.filter((incident) =>
+      [
+        incident.title,
+        incident.category,
+        incident.camera_id ?? "",
+        incident.source_alert_id,
+        ...incident.related_feature_ids,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedQuery)
+    );
+  }, [incidents, searchQuery]);
+
+  function handleExport() {
+    downloadCsv(
+      "worldtraffic-incidents.csv",
+      filteredIncidents.map((incident) => ({
+        id: incident.id,
+        title: incident.title,
+        source_alert_id: incident.source_alert_id,
+        category: incident.category,
+        severity: incident.severity,
+        status: incident.status,
+        created_at: incident.created_at,
+        updated_at: incident.updated_at,
+        camera_id: incident.camera_id ?? "",
+        latitude: incident.latitude,
+        longitude: incident.longitude,
+        operator_notes: incident.operator_notes,
+        related_feature_ids: incident.related_feature_ids.join(" | "),
+      }))
+    );
+  }
 
   return (
     <aside className="incidents-panel" aria-label="Incidents panel">
@@ -53,6 +96,20 @@ const IncidentsPanel: React.FC<IncidentsPanelProps> = ({
         </button>
       </div>
 
+      <div className="panel-toolbar">
+        <input
+          type="text"
+          className="panel-search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Search title, category, camera"
+          aria-label="Search incidents"
+        />
+        <button type="button" className="panel-action" onClick={handleExport}>
+          Export CSV
+        </button>
+      </div>
+
       {loading && incidents.length === 0 && (
         <div className="incidents-panel__state">Loading incidents...</div>
       )}
@@ -66,9 +123,14 @@ const IncidentsPanel: React.FC<IncidentsPanelProps> = ({
           No incidents have been promoted yet.
         </div>
       )}
+      {!loading && incidents.length > 0 && filteredIncidents.length === 0 && (
+        <div className="incidents-panel__state">
+          No incidents match the current search.
+        </div>
+      )}
 
       <div className="incidents-list">
-        {incidents.map((incident) => {
+        {filteredIncidents.map((incident) => {
           const isSelected = selectedIncidentId === incident.id;
           return (
             <div

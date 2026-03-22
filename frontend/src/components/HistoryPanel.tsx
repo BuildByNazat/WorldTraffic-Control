@@ -15,6 +15,7 @@ import type {
 import type { FilteredHistoryState } from "../hooks/useFilteredHistory";
 import { useReplay } from "../hooks/useReplay";
 import type { SelectedEventDetail, SelectedHistoryDetail } from "../types/selectedEvent";
+import { downloadCsv, downloadJson } from "../utils/export";
 
 type HistoryTab = "analytics" | "summary" | "detections" | "aircraft";
 
@@ -186,19 +187,25 @@ function SummaryTab({
 
 function LoadMoreFooter({
   visibleCount,
+  loadedCount,
   totalCount,
+  searchActive,
   onLoadMore,
   loadingMore,
 }: {
   visibleCount: number;
+  loadedCount: number;
   totalCount: number;
+  searchActive: boolean;
   onLoadMore: () => void;
   loadingMore: boolean;
 }) {
   return (
     <div className="history-list__footer">
       <span className="history-list__count">
-        Showing {visibleCount.toLocaleString()} of {totalCount.toLocaleString()}
+        {searchActive
+          ? `Showing ${visibleCount.toLocaleString()} matching / ${loadedCount.toLocaleString()} loaded / ${totalCount.toLocaleString()} total`
+          : `Showing ${visibleCount.toLocaleString()} of ${totalCount.toLocaleString()}`}
       </span>
       <button
         type="button"
@@ -213,27 +220,47 @@ function LoadMoreFooter({
 }
 
 function DetectionsTab({
-  feed,
+  detections,
+  loadedCount,
+  totalCount,
+  hasMore,
+  onLoadMore,
+  loadingMore,
+  loading,
+  error,
   onSelectEvent,
   selectedReplayKey,
   hasActiveFilters,
+  searchActive,
 }: {
-  feed: HistoryFeedState;
+  detections: DetectionRecord[];
+  loadedCount: number;
+  totalCount: number;
+  hasMore: boolean;
+  onLoadMore: () => void;
+  loadingMore: boolean;
+  loading: boolean;
+  error: string | null;
   onSelectEvent: (event: SelectedHistoryDetail) => void;
   selectedReplayKey: string | null;
   hasActiveFilters: boolean;
+  searchActive: boolean;
 }) {
-  if (feed.loading) return <div className="history-empty">Loading detections...</div>;
-  if (feed.error) return <div className="history-error">{feed.error}</div>;
-  if (feed.detections.length === 0) {
+  if (loading) return <div className="history-empty">Loading detections...</div>;
+  if (error) return <div className="history-error">{error}</div>;
+  if (detections.length === 0) {
     return (
       <div className="history-empty">
-        {hasActiveFilters
+        {searchActive
+          ? "No loaded detections match the current search."
+          : hasActiveFilters
           ? "No detections match the current filters."
           : "No detections are available yet."}
         <br />
         <span className="history-empty__hint">
-          {hasActiveFilters
+          {searchActive
+            ? "Load more records or broaden the search terms."
+            : hasActiveFilters
             ? "Try widening the time range or clearing a filter."
             : "Detections appear when the camera analysis pipeline records a result."}
         </span>
@@ -243,7 +270,7 @@ function DetectionsTab({
 
   return (
     <div className="history-list">
-      {feed.detections.map((detection) => {
+      {detections.map((detection) => {
         const detail = buildDetectionDetail(detection);
         const isSelected = selectedReplayKey === detail.eventKey;
 
@@ -270,12 +297,14 @@ function DetectionsTab({
         );
       })}
 
-      {feed.hasMoreDetections && (
+      {hasMore && (
         <LoadMoreFooter
-          visibleCount={feed.detections.length}
-          totalCount={feed.detectionsTotal}
-          onLoadMore={feed.loadMoreDetections}
-          loadingMore={feed.loadingMoreDetections}
+          visibleCount={detections.length}
+          loadedCount={loadedCount}
+          totalCount={totalCount}
+          searchActive={searchActive}
+          onLoadMore={onLoadMore}
+          loadingMore={loadingMore}
         />
       )}
     </div>
@@ -283,27 +312,47 @@ function DetectionsTab({
 }
 
 function AircraftTab({
-  feed,
+  aircraft,
+  loadedCount,
+  totalCount,
+  hasMore,
+  onLoadMore,
+  loadingMore,
+  loading,
+  error,
   onSelectEvent,
   selectedReplayKey,
   hasActiveFilters,
+  searchActive,
 }: {
-  feed: HistoryFeedState;
+  aircraft: AircraftRecord[];
+  loadedCount: number;
+  totalCount: number;
+  hasMore: boolean;
+  onLoadMore: () => void;
+  loadingMore: boolean;
+  loading: boolean;
+  error: string | null;
   onSelectEvent: (event: SelectedHistoryDetail) => void;
   selectedReplayKey: string | null;
   hasActiveFilters: boolean;
+  searchActive: boolean;
 }) {
-  if (feed.loading) return <div className="history-empty">Loading aircraft...</div>;
-  if (feed.error) return <div className="history-error">{feed.error}</div>;
-  if (feed.aircraft.length === 0) {
+  if (loading) return <div className="history-empty">Loading aircraft...</div>;
+  if (error) return <div className="history-error">{error}</div>;
+  if (aircraft.length === 0) {
     return (
       <div className="history-empty">
-        {hasActiveFilters
+        {searchActive
+          ? "No loaded aircraft records match the current search."
+          : hasActiveFilters
           ? "No aircraft records match the current filters."
           : "No aircraft observations are available yet."}
         <br />
         <span className="history-empty__hint">
-          {hasActiveFilters
+          {searchActive
+            ? "Load more records or broaden the search terms."
+            : hasActiveFilters
             ? "Try widening the time range or clearing a filter."
             : "Aircraft observations appear when the live feed records a position."}
         </span>
@@ -313,7 +362,7 @@ function AircraftTab({
 
   return (
     <div className="history-list">
-      {feed.aircraft.map((record) => {
+      {aircraft.map((record) => {
         const detail = buildAircraftDetail(record);
         const isSelected = selectedReplayKey === detail.eventKey;
 
@@ -340,12 +389,14 @@ function AircraftTab({
         );
       })}
 
-      {feed.hasMoreAircraft && (
+      {hasMore && (
         <LoadMoreFooter
-          visibleCount={feed.aircraft.length}
-          totalCount={feed.aircraftTotal}
-          onLoadMore={feed.loadMoreAircraft}
-          loadingMore={feed.loadingMoreAircraft}
+          visibleCount={aircraft.length}
+          loadedCount={loadedCount}
+          totalCount={totalCount}
+          searchActive={searchActive}
+          onLoadMore={onLoadMore}
+          loadingMore={loadingMore}
         />
       )}
     </div>
@@ -359,9 +410,45 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
   selectedEvent,
 }) => {
   const [tab, setTab] = useState<HistoryTab>("analytics");
+  const [searchQuery, setSearchQuery] = useState("");
   const analytics = useAnalytics(true, filters.filters);
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const searchedDetections = useMemo(() => {
+    if (!normalizedSearchQuery) {
+      return feed.detections;
+    }
+
+    return feed.detections.filter((detection) =>
+      [
+        detection.label,
+        detection.category,
+        detection.camera_id,
+        detection.feature_id,
+        detection.source,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedSearchQuery)
+    );
+  }, [feed.detections, normalizedSearchQuery]);
+  const searchedAircraft = useMemo(() => {
+    if (!normalizedSearchQuery) {
+      return feed.aircraft;
+    }
+
+    return feed.aircraft.filter((record) =>
+      [
+        record.callsign ?? "",
+        record.feature_id,
+        record.source,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedSearchQuery)
+    );
+  }, [feed.aircraft, normalizedSearchQuery]);
   const replayEvents = useMemo(() => {
-    const detectionEvents = feed.detections.map((detection) => ({
+    const detectionEvents = searchedDetections.map((detection) => ({
       eventKey: `detection:${detection.id}`,
       featureId: detection.feature_id,
       timestamp: detection.detected_at,
@@ -372,7 +459,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
       detail: buildDetectionDetail(detection),
     }));
 
-    const aircraftEvents = feed.aircraft.map((record) => ({
+    const aircraftEvents = searchedAircraft.map((record) => ({
       eventKey: `aircraft:${record.id}`,
       featureId: record.feature_id,
       timestamp: record.observed_at,
@@ -396,7 +483,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
           replayTotal: allEvents.length,
         },
       }));
-  }, [feed.aircraft, feed.detections]);
+  }, [searchedAircraft, searchedDetections]);
 
   const replay = useReplay(replayEvents);
   const selectedReplayKey =
@@ -407,18 +494,18 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
 
     const selectedFeatureId = selectedEvent.featureIds[0];
     const selectedStillVisible =
-      feed.detections.some((record) => record.feature_id === selectedFeatureId) ||
-      feed.aircraft.some((record) => record.feature_id === selectedFeatureId);
+      searchedDetections.some((record) => record.feature_id === selectedFeatureId) ||
+      searchedAircraft.some((record) => record.feature_id === selectedFeatureId);
 
     if (!selectedStillVisible) {
       replay.clearSelection();
       onSelectEvent(null);
     }
   }, [
-    feed.aircraft,
-    feed.detections,
     onSelectEvent,
     replay.clearSelection,
+    searchedAircraft,
+    searchedDetections,
     selectedEvent,
   ]);
 
@@ -442,6 +529,52 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
 
     replay.selectEvent(detail.eventKey);
     onSelectEvent(detail);
+  }
+
+  function handleExportHistoryCsv() {
+    downloadCsv("worldtraffic-history.csv", [
+      ...searchedDetections.map((detection) => ({
+        record_type: "detection",
+        id: detection.id,
+        feature_id: detection.feature_id,
+        label: detection.label,
+        category: detection.category,
+        timestamp: detection.detected_at,
+        source: detection.source,
+        camera_id: detection.camera_id,
+        confidence: detection.confidence,
+        callsign: "",
+        altitude: "",
+        speed: "",
+        latitude: detection.latitude,
+        longitude: detection.longitude,
+      })),
+      ...searchedAircraft.map((record) => ({
+        record_type: "aircraft",
+        id: record.id,
+        feature_id: record.feature_id,
+        label: record.callsign ?? record.feature_id,
+        category: "aircraft",
+        timestamp: record.observed_at,
+        source: record.source,
+        camera_id: "",
+        confidence: "",
+        callsign: record.callsign ?? "",
+        altitude: record.altitude ?? "",
+        speed: record.speed ?? "",
+        latitude: record.latitude,
+        longitude: record.longitude,
+      })),
+    ]);
+  }
+
+  function handleExportHistoryJson() {
+    downloadJson("worldtraffic-history.json", {
+      filters: filters.filters,
+      search_query: searchQuery,
+      detections: searchedDetections,
+      aircraft: searchedAircraft,
+    });
   }
 
   return (
@@ -501,6 +634,33 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
         disabled={feed.loading}
       />
 
+      <div className="panel-toolbar panel-toolbar--history">
+        <input
+          type="text"
+          className="panel-search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Search label, category, camera, callsign"
+          aria-label="Search loaded history records"
+        />
+        <div className="panel-toolbar__actions">
+          <button
+            type="button"
+            className="panel-action"
+            onClick={handleExportHistoryCsv}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className="panel-action"
+            onClick={handleExportHistoryJson}
+          >
+            Export JSON
+          </button>
+        </div>
+      </div>
+
       <ReplayControls
         hasEvents={replay.hasEvents}
         isPlaying={replay.isPlaying}
@@ -527,18 +687,34 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
         )}
         {tab === "detections" && (
           <DetectionsTab
-            feed={feed}
+            detections={searchedDetections}
+            loadedCount={feed.detections.length}
+            totalCount={feed.detectionsTotal}
+            hasMore={feed.hasMoreDetections}
+            onLoadMore={feed.loadMoreDetections}
+            loadingMore={feed.loadingMoreDetections}
+            loading={feed.loading}
+            error={feed.error}
             onSelectEvent={handleReplayListSelection}
             selectedReplayKey={selectedReplayKey}
             hasActiveFilters={filters.hasActiveFilters}
+            searchActive={normalizedSearchQuery.length > 0}
           />
         )}
         {tab === "aircraft" && (
           <AircraftTab
-            feed={feed}
+            aircraft={searchedAircraft}
+            loadedCount={feed.aircraft.length}
+            totalCount={feed.aircraftTotal}
+            hasMore={feed.hasMoreAircraft}
+            onLoadMore={feed.loadMoreAircraft}
+            loadingMore={feed.loadingMoreAircraft}
+            loading={feed.loading}
+            error={feed.error}
             onSelectEvent={handleReplayListSelection}
             selectedReplayKey={selectedReplayKey}
             hasActiveFilters={filters.hasActiveFilters}
+            searchActive={normalizedSearchQuery.length > 0}
           />
         )}
       </div>

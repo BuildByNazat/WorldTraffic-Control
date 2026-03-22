@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import type { AlertRecord, AlertsState } from "../hooks/useAlerts";
+import { downloadCsv } from "../utils/export";
 
 interface AlertsPanelProps {
   alertsState: AlertsState;
@@ -25,9 +26,46 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
   variant = "full",
   selectedAlertId = null,
 }) => {
+  const [searchQuery, setSearchQuery] = useState("");
   const { alerts, summary, loading, error, acknowledge, resolve, newestAlertNotice } =
     alertsState;
-  const visibleAlerts = variant === "compact" ? alerts.slice(0, 4) : alerts;
+  const filteredAlerts = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return alerts;
+    }
+
+    return alerts.filter((alert) =>
+      [
+        alert.title,
+        alert.category,
+        alert.camera_id ?? "",
+        alert.source,
+        ...alert.feature_ids,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedQuery)
+    );
+  }, [alerts, searchQuery]);
+  const visibleAlerts =
+    variant === "compact" ? filteredAlerts.slice(0, 4) : filteredAlerts;
+
+  function handleExport() {
+    downloadCsv("worldtraffic-alerts.csv", filteredAlerts.map((alert) => ({
+      id: alert.id,
+      title: alert.title,
+      category: alert.category,
+      severity: alert.severity,
+      status: alert.status,
+      timestamp: alert.timestamp,
+      source: alert.source,
+      camera_id: alert.camera_id ?? "",
+      latitude: alert.latitude,
+      longitude: alert.longitude,
+      feature_ids: alert.feature_ids.join(" | "),
+    })));
+  }
 
   return (
     <aside
@@ -52,6 +90,22 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
           {loading ? "Syncing" : "Sync"}
         </button>
       </div>
+
+      {variant === "full" && (
+        <div className="panel-toolbar">
+          <input
+            type="text"
+            className="panel-search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search title, category, camera"
+            aria-label="Search alerts"
+          />
+          <button type="button" className="panel-action" onClick={handleExport}>
+            Export CSV
+          </button>
+        </div>
+      )}
 
       {newestAlertNotice && variant === "compact" && (
         <button
@@ -102,6 +156,12 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
           {variant === "compact"
             ? "No open alerts in the current live view."
             : "No active alerts are available for review."}
+        </div>
+      )}
+
+      {!loading && alerts.length > 0 && filteredAlerts.length === 0 && (
+        <div className="alerts-panel__state">
+          No alerts match the current search.
         </div>
       )}
 
@@ -156,9 +216,9 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
         ))}
       </div>
 
-      {variant === "compact" && alerts.length > visibleAlerts.length && (
+      {variant === "compact" && filteredAlerts.length > visibleAlerts.length && (
         <div className="alerts-panel__footer">
-          Showing {visibleAlerts.length} of {alerts.length} alerts
+          Showing {visibleAlerts.length} of {filteredAlerts.length} alerts
         </div>
       )}
     </aside>
