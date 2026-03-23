@@ -14,6 +14,7 @@ import {
 } from "../hooks/useLiveFeed";
 import type { AlertRecord } from "../hooks/useAlerts";
 import type { MapLayerState } from "../hooks/useMapLayers";
+import type { AppTheme } from "../hooks/useTheme";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -315,6 +316,7 @@ export interface LiveMapProps {
   data: CombinedFeatureCollection | null;
   alerts: AlertRecord[];
   layerState: MapLayerState;
+  theme: AppTheme;
   highlightLocation?: HighlightLocation | null;
   highlightVariant?: HighlightVariant;
   selectedAlertId?: string | null;
@@ -325,6 +327,7 @@ const LiveMap: React.FC<LiveMapProps> = ({
   data,
   alerts,
   layerState,
+  theme,
   highlightLocation,
   highlightVariant = null,
   selectedAlertId = null,
@@ -339,7 +342,7 @@ const LiveMap: React.FC<LiveMapProps> = ({
 
   return (
     <MapContainer
-      className="map-container map-container--dark"
+      className={`map-container map-container--${theme}`}
       center={[20, 0]}
       zoom={3}
       minZoom={2}
@@ -348,7 +351,11 @@ const LiveMap: React.FC<LiveMapProps> = ({
     >
       <TileLayer
         attribution='&copy; OpenStreetMap contributors &copy; CARTO'
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        url={
+          theme === "light"
+            ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        }
       />
       <LiveMarkersLayer data={data} layers={layerState} />
       <AlertMarkersLayer

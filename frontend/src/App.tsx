@@ -1,12 +1,8 @@
 /**
- * App - root component.
+ * App - root product shell.
  *
- * Manages two modes:
- *   live    - WebSocket feed drives the map, status panel visible
- *   history - history panel visible, clicking items highlights on map
- *
- * The live feed is always running in the background; switching to history
- * mode simply shows the panel and allows selecting historical points.
+ * The map remains the primary experience while workspace panels move into a
+ * collapsible left rail and an optional right-side review panel.
  */
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -27,11 +23,14 @@ import { useAlerts, type AlertRecord } from "./hooks/useAlerts";
 import { useIncidents, type IncidentRecord } from "./hooks/useIncidents";
 import { useMapLayers } from "./hooks/useMapLayers";
 import { useServiceStatus } from "./hooks/useServiceStatus";
+import { useTheme } from "./hooks/useTheme";
 import type {
   SelectedAlertDetail,
   SelectedEventDetail,
   SelectedIncidentDetail,
 } from "./types/selectedEvent";
+
+type WorkspaceSection = "operations" | "alerts" | "incidents";
 
 function isSameSelection(
   current: SelectedEventDetail | null,
@@ -44,13 +43,30 @@ function isSameSelection(
   return current.id === next.id;
 }
 
+const WORKSPACE_LABELS: Record<WorkspaceSection, string> = {
+  operations: "Operations",
+  alerts: "Alerts",
+  incidents: "Incidents",
+};
+
+const WORKSPACE_SHORT_LABELS: Record<WorkspaceSection, string> = {
+  operations: "Ops",
+  alerts: "Alt",
+  incidents: "Inc",
+};
+
 const App: React.FC = () => {
   const { data, status, lastUpdate } = useLiveFeed();
+  const { theme, toggleTheme } = useTheme();
   const [mode, setMode] = useState<AppMode>("live");
   const [selectedEvent, setSelectedEvent] = useState<SelectedEventDetail | null>(
     null
   );
   const [highlight, setHighlight] = useState<HighlightLocation | null>(null);
+  const [workspaceSection, setWorkspaceSection] =
+    useState<WorkspaceSection>("operations");
+  const [workspaceOpen, setWorkspaceOpen] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const historyFilters = useFilteredHistory();
   const historyFeed = useHistoryFeed(mode === "history", historyFilters.filters);
@@ -62,6 +78,13 @@ const App: React.FC = () => {
   const aircraftCount = data?.features.filter(isAircraftFeature).length ?? 0;
   const detectionCount =
     data?.features.filter((feature) => !isAircraftFeature(feature)).length ?? 0;
+
+  const openAlertsCount =
+    alertsState.summary?.total_open_alerts ??
+    alertsState.alerts.filter((alert) => alert.status !== "resolved").length;
+  const openIncidentsCount = incidentsState.incidents.filter(
+    (incident) => incident.status !== "closed"
+  ).length;
 
   const linkedIncident = useMemo(() => {
     if (selectedEvent?.kind === "alert") {
@@ -75,6 +98,14 @@ const App: React.FC = () => {
     }
     return null;
   }, [incidentsState, selectedEvent]);
+
+  useEffect(() => {
+    if (mode === "history") {
+      setHistoryOpen(true);
+    } else {
+      setHistoryOpen(false);
+    }
+  }, [mode]);
 
   useEffect(() => {
     if (selectedEvent?.kind !== "incident") return;
@@ -161,6 +192,8 @@ const App: React.FC = () => {
       return;
     }
 
+    setWorkspaceSection("alerts");
+    setWorkspaceOpen(true);
     applySelection(detail);
   }
 
@@ -187,6 +220,8 @@ const App: React.FC = () => {
       return;
     }
 
+    setWorkspaceSection("incidents");
+    setWorkspaceOpen(true);
     applySelection(detail);
   }
 
@@ -211,95 +246,218 @@ const App: React.FC = () => {
           <div className="app-header__titles">
             <h1>WorldTraffic Control</h1>
             <span className="app-header__tagline">
-              Live operations, review, and situational awareness
+              Unified map-based tracking where live position data is available
             </span>
           </div>
         </div>
+
         <div className="app-header__spacer" />
-        <nav className="app-header__links" aria-label="Product information">
-          <a href="/about.html" target="_blank" rel="noreferrer">
-            About
-          </a>
-          <a href="/privacy.html" target="_blank" rel="noreferrer">
-            Privacy
-          </a>
-          <a href="/terms.html" target="_blank" rel="noreferrer">
-            Terms
-          </a>
-        </nav>
-        <ModeToggle mode={mode} onModeChange={handleModeChange} />
+
+        <div className="app-header__controls">
+          <button
+            type="button"
+            className="app-header__button"
+            onClick={() => setWorkspaceOpen((current) => !current)}
+          >
+            {workspaceOpen ? "Hide workspace" : "Show workspace"}
+          </button>
+
+          {mode === "history" && (
+            <button
+              type="button"
+              className="app-header__button"
+              onClick={() => setHistoryOpen((current) => !current)}
+            >
+              {historyOpen ? "Hide review" : "Show review"}
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="app-header__button app-header__button--theme"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+          >
+            {theme === "dark" ? "Light theme" : "Dark theme"}
+          </button>
+
+          <nav className="app-header__links" aria-label="Product information">
+            <a href="/about.html" target="_blank" rel="noreferrer">
+              About
+            </a>
+            <a href="/privacy.html" target="_blank" rel="noreferrer">
+              Privacy
+            </a>
+            <a href="/terms.html" target="_blank" rel="noreferrer">
+              Terms
+            </a>
+          </nav>
+
+          <ModeToggle mode={mode} onModeChange={handleModeChange} />
+        </div>
       </header>
 
-      <main className="app-content">
-        <LiveMap
-          data={data}
-          alerts={alertsState.alerts}
-          layerState={mapLayers.layers}
-          highlightLocation={highlight}
-          highlightVariant={
-            selectedEvent?.kind === "history"
-              ? "replay"
-              : selectedEvent?.kind === "alert" || selectedEvent?.kind === "incident"
-                ? "selected"
-                : null
-          }
-          selectedAlertId={selectedEvent?.kind === "alert" ? selectedEvent.id : null}
-          onSelectAlert={selectAlert}
-        />
+      <main className={`app-layout app-layout--${mode}`}>
+        <aside
+          className={`app-sidebar${workspaceOpen ? "" : " app-sidebar--collapsed"}`}
+          aria-label="Workspace panel"
+        >
+          <div className="app-sidebar__nav">
+            {(["operations", "alerts", "incidents"] as WorkspaceSection[]).map(
+              (section) => (
+                <button
+                  key={section}
+                  type="button"
+                  className={`app-sidebar__tab${
+                    workspaceSection === section ? " app-sidebar__tab--active" : ""
+                  }`}
+                  onClick={() => {
+                    setWorkspaceSection(section);
+                    setWorkspaceOpen(true);
+                  }}
+                  title={WORKSPACE_LABELS[section]}
+                >
+                  <span className="app-sidebar__tab-short">
+                    {WORKSPACE_SHORT_LABELS[section]}
+                  </span>
+                  {workspaceOpen && (
+                    <>
+                      <span className="app-sidebar__tab-label">
+                        {WORKSPACE_LABELS[section]}
+                      </span>
+                      {section === "alerts" && openAlertsCount > 0 && (
+                        <span className="app-sidebar__tab-count">{openAlertsCount}</span>
+                      )}
+                      {section === "incidents" && openIncidentsCount > 0 && (
+                        <span className="app-sidebar__tab-count">
+                          {openIncidentsCount}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </button>
+              )
+            )}
+          </div>
 
-        <StatusPanel
-          status={status}
-          aircraftCount={aircraftCount}
-          detectionCount={detectionCount}
-          lastUpdate={lastUpdate}
-          serviceStatus={serviceStatusState.status}
-          serviceStatusLoading={serviceStatusState.loading}
-          serviceStatusError={serviceStatusState.error}
-        />
+          {workspaceOpen && (
+            <div className="app-sidebar__content">
+              {workspaceSection === "operations" && (
+                <div className="app-sidebar__stack">
+                  <StatusPanel
+                    status={status}
+                    aircraftCount={aircraftCount}
+                    detectionCount={detectionCount}
+                    lastUpdate={lastUpdate}
+                    serviceStatus={serviceStatusState.status}
+                    serviceStatusLoading={serviceStatusState.loading}
+                    serviceStatusError={serviceStatusState.error}
+                  />
+                  <LayerControls
+                    layers={mapLayers.layers}
+                    onToggleLayer={mapLayers.toggleLayer}
+                  />
+                </div>
+              )}
 
-        <LayerControls
-          layers={mapLayers.layers}
-          onToggleLayer={mapLayers.toggleLayer}
-        />
+              {workspaceSection === "alerts" && (
+                <AlertsPanel
+                  alertsState={alertsState}
+                  onSelectAlert={selectAlert}
+                  variant="full"
+                  selectedAlertId={selectedEvent?.kind === "alert" ? selectedEvent.id : null}
+                />
+              )}
 
-        <AlertsPanel
-          alertsState={alertsState}
-          onSelectAlert={selectAlert}
-          variant={mode === "live" ? "compact" : "full"}
-          selectedAlertId={selectedEvent?.kind === "alert" ? selectedEvent.id : null}
-        />
+              {workspaceSection === "incidents" && (
+                <IncidentsPanel
+                  incidentsState={incidentsState}
+                  selectedIncidentId={
+                    selectedEvent?.kind === "incident" ? selectedEvent.id : null
+                  }
+                  onSelectIncident={selectIncident}
+                />
+              )}
+            </div>
+          )}
+        </aside>
 
-        <EventDetailDrawer
-          selectedEvent={selectedEvent}
-          onClose={clearSelection}
-          linkedIncident={linkedIncident}
-          onCreateIncidentFromAlert={() => {
-            void handleCreateIncidentFromSelectedAlert();
-          }}
-          onOpenLinkedIncident={() => {
-            if (linkedIncident) {
-              selectIncident(linkedIncident, false);
-            }
-          }}
-        />
+        <section className="app-map-shell">
+          <div className="app-map-toolbar">
+            <div className="app-map-toolbar__text">
+              <span className="app-map-toolbar__eyebrow">
+                {mode === "live" ? "Live tracking" : "Recorded review"}
+              </span>
+              <span className="app-map-toolbar__title">
+                The map stays primary while workspace panels open only when needed.
+              </span>
+            </div>
+            <div className="app-map-toolbar__actions">
+              {!workspaceOpen && (
+                <button
+                  type="button"
+                  className="app-map-toolbar__button"
+                  onClick={() => setWorkspaceOpen(true)}
+                >
+                  Open workspace
+                </button>
+              )}
+              {mode === "history" && !historyOpen && (
+                <button
+                  type="button"
+                  className="app-map-toolbar__button"
+                  onClick={() => setHistoryOpen(true)}
+                >
+                  Open review
+                </button>
+              )}
+            </div>
+          </div>
 
-        {mode === "history" && (
-          <IncidentsPanel
-            incidentsState={incidentsState}
-            selectedIncidentId={
-              selectedEvent?.kind === "incident" ? selectedEvent.id : null
-            }
-            onSelectIncident={selectIncident}
-          />
-        )}
+          <div className="app-map-stage">
+            <LiveMap
+              data={data}
+              alerts={alertsState.alerts}
+              layerState={mapLayers.layers}
+              theme={theme}
+              highlightLocation={highlight}
+              highlightVariant={
+                selectedEvent?.kind === "history"
+                  ? "replay"
+                  : selectedEvent?.kind === "alert" ||
+                      selectedEvent?.kind === "incident"
+                    ? "selected"
+                    : null
+              }
+              selectedAlertId={selectedEvent?.kind === "alert" ? selectedEvent.id : null}
+              onSelectAlert={selectAlert}
+            />
 
-        {mode === "history" && (
-          <HistoryPanel
-            feed={historyFeed}
-            filters={historyFilters}
-            onSelectEvent={handleSelectEvent}
-            selectedEvent={selectedEvent}
-          />
+            <EventDetailDrawer
+              selectedEvent={selectedEvent}
+              onClose={clearSelection}
+              linkedIncident={linkedIncident}
+              onCreateIncidentFromAlert={() => {
+                void handleCreateIncidentFromSelectedAlert();
+              }}
+              onOpenLinkedIncident={() => {
+                if (linkedIncident) {
+                  selectIncident(linkedIncident, false);
+                }
+              }}
+            />
+          </div>
+        </section>
+
+        {mode === "history" && historyOpen && (
+          <section className="app-history-shell">
+            <HistoryPanel
+              feed={historyFeed}
+              filters={historyFilters}
+              onSelectEvent={handleSelectEvent}
+              selectedEvent={selectedEvent}
+            />
+          </section>
         )}
       </main>
     </div>

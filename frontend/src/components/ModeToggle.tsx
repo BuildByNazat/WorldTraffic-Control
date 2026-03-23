@@ -31,9 +31,9 @@ const ModeToggle: React.FC<ModeToggleProps> = ({ mode, onModeChange }) => {
         aria-pressed={mode === "history"}
       >
         <span className="mode-toggle__icon" aria-hidden="true">
-          T
+          RV
         </span>
-        <span className="mode-toggle__label">History</span>
+        <span className="mode-toggle__label">Review</span>
       </button>
     </div>
   );

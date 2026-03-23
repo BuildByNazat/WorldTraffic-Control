@@ -78,8 +78,10 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
 
   return (
     <div className="status-panel" role="status" aria-live="polite">
-      <div className="status-panel__title">Live Operations</div>
-      <div className="status-panel__subtitle">Current transport activity and service readiness</div>
+      <div className="status-panel__title">Tracking Status</div>
+      <div className="status-panel__subtitle">
+        Live positions and service readiness where upstream data is available
+      </div>
 
       <div className="status-panel__row">
         <span className="status-panel__label">Feed</span>
