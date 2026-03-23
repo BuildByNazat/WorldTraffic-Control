@@ -12,6 +12,7 @@ Repositories use async_session_factory() to acquire sessions.
 import logging
 from pathlib import Path
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -34,7 +35,12 @@ def _make_engine() -> AsyncEngine:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     url = f"sqlite+aiosqlite:///{settings.db_path}"
     logger.info("Database: %s", db_path.resolve())
-    return create_async_engine(url, echo=False)
+    return create_async_engine(
+        url,
+        echo=False,
+        pool_pre_ping=True,
+        connect_args={"timeout": 30},
+    )
 
 
 engine: AsyncEngine = _make_engine()
@@ -57,8 +63,23 @@ async def init_db() -> None:
     Called once from the FastAPI lifespan startup hook.
     """
     async with engine.begin() as conn:
+        await conn.exec_driver_sql("PRAGMA journal_mode=WAL;")
+        await conn.exec_driver_sql("PRAGMA synchronous=NORMAL;")
+        await conn.exec_driver_sql("PRAGMA foreign_keys=ON;")
+        await conn.exec_driver_sql("PRAGMA busy_timeout=30000;")
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database initialized.")
+
+
+async def check_db_connection() -> bool:
+    """Run a lightweight readiness query against the configured database."""
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        logger.exception("Database readiness check failed.")
+        return False
 
 
 async def close_db() -> None:

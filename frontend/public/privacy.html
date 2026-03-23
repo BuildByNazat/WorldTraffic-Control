@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy | WorldTraffic Control</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #07101a;
+        --surface: rgba(17, 25, 38, 0.92);
+        --border: rgba(116, 182, 255, 0.18);
+        --text: #eff6ff;
+        --muted: rgba(178, 193, 214, 0.82);
+        --accent: #74b6ff;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, sans-serif;
+        background:
+          radial-gradient(circle at top, rgba(116, 182, 255, 0.14), transparent 30%),
+          linear-gradient(180deg, #0a1320, var(--bg));
+        color: var(--text);
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 32px 16px;
+      }
+      main {
+        width: min(760px, 100%);
+        padding: 28px;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        background: var(--surface);
+        backdrop-filter: blur(18px);
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.42);
+      }
+      h1 { margin: 0 0 8px; font-size: 1.8rem; }
+      p, li { color: var(--muted); line-height: 1.7; }
+      .eyebrow {
+        color: var(--accent);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        margin-bottom: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">WorldTraffic Control</div>
+      <h1>Privacy Notice Placeholder</h1>
+      <p>
+        This public page is a deployment placeholder. Replace it with your final
+        privacy notice before handling commercial traffic, customer information,
+        or production operator accounts.
+      </p>
+      <p>
+        At minimum, a production privacy notice should explain what operational
+        data is collected, how long it is retained, whether third-party feeds
+        are used, and who to contact for privacy-related requests.
+      </p>
+    </main>
+  </body>
+</html>

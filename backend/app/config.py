@@ -45,6 +45,15 @@ def _get_optional_str(name: str) -> Optional[str]:
     return value or None
 
 
+def _get_choice(name: str, default: str, allowed: set[str]) -> str:
+    value = (os.getenv(name, default)).strip().lower()
+    if value not in allowed:
+        raise ValueError(
+            f"{name} must be one of {sorted(allowed)}, received {value!r}."
+        )
+    return value
+
+
 def _get_float(name: str, default: float, *, minimum: Optional[float] = None) -> float:
     raw_value = os.getenv(name)
     if raw_value is None or raw_value.strip() == "":
@@ -83,6 +92,7 @@ def _resolve_db_path(raw_path: Optional[str]) -> str:
 
 @dataclass(frozen=True)
 class Settings:
+    app_env: str = "development"
     aircraft_provider: str = "simulated"
     opensky_username: Optional[str] = None
     opensky_password: Optional[str] = None
@@ -91,6 +101,7 @@ class Settings:
     gemini_api_key: Optional[str] = None
     db_path: str = str((BACKEND_DIR / "data" / "worldtraffic.db").resolve())
     cors_origins: tuple[str, ...] = DEFAULT_LOCAL_CORS_ORIGINS
+    public_base_url: Optional[str] = None
     default_cameras: list = field(
         default_factory=lambda: [
             {
@@ -108,6 +119,8 @@ class Settings:
 def _load_settings() -> Settings:
     _load_env_files()
 
+    app_env = _get_choice("APP_ENV", "development", {"development", "production"})
+
     provider = (os.getenv("AIRCRAFT_PROVIDER", "simulated")).strip().lower()
     if provider not in {"simulated", "opensky"}:
         logger.warning(
@@ -119,7 +132,15 @@ def _load_settings() -> Settings:
     if provider == "opensky" and not _get_optional_str("OPENSKY_USERNAME"):
         logger.info("OpenSky is enabled without credentials. Anonymous rate limits apply.")
 
+    cors_origins = _get_csv("CORS_ORIGINS", DEFAULT_LOCAL_CORS_ORIGINS)
+    if app_env == "production" and cors_origins == DEFAULT_LOCAL_CORS_ORIGINS:
+        logger.warning(
+            "APP_ENV=production is using localhost-only CORS defaults. "
+            "Set CORS_ORIGINS for the real public frontend origin."
+        )
+
     return Settings(
+        app_env=app_env,
         aircraft_provider=provider,
         opensky_username=_get_optional_str("OPENSKY_USERNAME"),
         opensky_password=_get_optional_str("OPENSKY_PASSWORD"),
@@ -127,12 +148,14 @@ def _load_settings() -> Settings:
         camera_fetch_interval=_get_float("CAMERA_FETCH_INTERVAL", 60.0, minimum=5.0),
         gemini_api_key=_get_optional_str("GEMINI_API_KEY"),
         db_path=_resolve_db_path(os.getenv("DB_PATH")),
-        cors_origins=_get_csv("CORS_ORIGINS", DEFAULT_LOCAL_CORS_ORIGINS),
+        cors_origins=cors_origins,
+        public_base_url=_get_optional_str("PUBLIC_BASE_URL"),
     )
 
 
 settings = _load_settings()
 
+APP_ENV: str = settings.app_env
 AIRCRAFT_PROVIDER: str = settings.aircraft_provider
 OPENSKY_USERNAME: Optional[str] = settings.opensky_username
 OPENSKY_PASSWORD: Optional[str] = settings.opensky_password
@@ -141,4 +164,5 @@ CAMERA_FETCH_INTERVAL: float = settings.camera_fetch_interval
 GEMINI_API_KEY: Optional[str] = settings.gemini_api_key
 DB_PATH: str = settings.db_path
 CORS_ORIGINS: tuple[str, ...] = settings.cors_origins
+PUBLIC_BASE_URL: Optional[str] = settings.public_base_url
 DEFAULT_CAMERAS: list = settings.default_cameras

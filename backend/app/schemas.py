@@ -83,12 +83,16 @@ class CombinedFeatureCollection(BaseModel):
 
 class ServiceStatus(BaseModel):
     status: Literal["ok"] = "ok"
+    app_env: str
     aircraft_provider: str
+    simulated_mode: bool
+    opensky_configured: bool
     broadcast_interval_seconds: float
     camera_fetch_interval_seconds: float
     camera_count: int
     active_ws_connections: int
     gemini_enabled: bool
+    public_base_url: Optional[str] = None
     db_path: str
 
 

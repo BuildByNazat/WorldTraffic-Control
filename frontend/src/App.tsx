@@ -26,6 +26,7 @@ import { useHistoryFeed } from "./hooks/useHistoryFeed";
 import { useAlerts, type AlertRecord } from "./hooks/useAlerts";
 import { useIncidents, type IncidentRecord } from "./hooks/useIncidents";
 import { useMapLayers } from "./hooks/useMapLayers";
+import { useServiceStatus } from "./hooks/useServiceStatus";
 import type {
   SelectedAlertDetail,
   SelectedEventDetail,
@@ -56,6 +57,7 @@ const App: React.FC = () => {
   const alertsState = useAlerts(true);
   const incidentsState = useIncidents(true);
   const mapLayers = useMapLayers();
+  const serviceStatusState = useServiceStatus(true);
 
   const aircraftCount = data?.features.filter(isAircraftFeature).length ?? 0;
   const detectionCount =
@@ -214,6 +216,17 @@ const App: React.FC = () => {
           </div>
         </div>
         <div className="app-header__spacer" />
+        <nav className="app-header__links" aria-label="Product information">
+          <a href="/about.html" target="_blank" rel="noreferrer">
+            About
+          </a>
+          <a href="/privacy.html" target="_blank" rel="noreferrer">
+            Privacy
+          </a>
+          <a href="/terms.html" target="_blank" rel="noreferrer">
+            Terms
+          </a>
+        </nav>
         <ModeToggle mode={mode} onModeChange={handleModeChange} />
       </header>
 
@@ -239,6 +252,9 @@ const App: React.FC = () => {
           aircraftCount={aircraftCount}
           detectionCount={detectionCount}
           lastUpdate={lastUpdate}
+          serviceStatus={serviceStatusState.status}
+          serviceStatusLoading={serviceStatusState.loading}
+          serviceStatusError={serviceStatusState.error}
         />
 
         <LayerControls

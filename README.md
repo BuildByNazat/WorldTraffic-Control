@@ -101,6 +101,10 @@ Configured in `backend/.env` or project-root `.env`.
   - Optional
   - Default: `simulated`
   - Valid: `simulated`, `opensky`
+- `APP_ENV`
+  - Optional
+  - Default: `development`
+  - Valid: `development`, `production`
 - `OPENSKY_USERNAME`
   - Optional
   - Used when `AIRCRAFT_PROVIDER=opensky`
@@ -119,9 +123,13 @@ Configured in `backend/.env` or project-root `.env`.
 - `DB_PATH`
   - Optional
   - Default: `data/worldtraffic.db` relative to `backend/`
+- `PUBLIC_BASE_URL`
+  - Optional
+  - Public app URL for deployment-facing status/docs context
 - `CORS_ORIGINS`
   - Optional
   - Comma-separated list of allowed frontend origins
+  - For public deployment, replace localhost defaults with the real frontend origin
 
 ### Frontend
 
@@ -150,13 +158,13 @@ docker compose up --build
 
 URLs:
 - App: `http://localhost:8080`
-- Backend API: `http://localhost:8000`
 
 Notes:
 - the frontend container serves the built app with nginx
 - `/api/*` and `/ws/*` are proxied to the backend container
 - SQLite data is persisted in the named Docker volume `worldtraffic_data`
 - the default Docker path is also demo-friendly and works without Gemini or OpenSky credentials
+- the backend is intentionally kept internal to the compose network; public access flows through the frontend reverse proxy
 
 To stop the stack:
 
@@ -194,6 +202,9 @@ Recommended production pattern:
 - serve the frontend static build from a web server or CDN
 - reverse-proxy `/api` and `/ws/live` to the FastAPI backend
 - set `CORS_ORIGINS` to the deployed frontend origin if frontend and backend are on different origins
+- use `APP_ENV=production`
+- expose health endpoints at `/healthz` and `/readyz`
+- keep the same-origin frontend/API model where practical
 
 ## Recommended demo setup
 
@@ -204,6 +215,27 @@ For the most reliable public demo:
 - switch to History mode to show replay, analytics, filters, incidents, and export
 
 This avoids rate-limit or external API surprises while still showing the full product flow.
+
+## Production deployment notes
+
+For a first real public deployment:
+- prefer the same-origin model already used by the nginx container so the browser only talks to one public host
+- set `APP_ENV=production`
+- set `PUBLIC_BASE_URL` to the public HTTPS URL
+- replace default localhost `CORS_ORIGINS` with the real public frontend origin if you are serving frontend and backend separately
+- persist `DB_PATH` on durable storage; SQLite is acceptable for a single-node first deployment but not for multi-instance write-heavy scaling
+- keep `AIRCRAFT_PROVIDER=simulated` until OpenSky credentials and upstream reliability are ready for public use
+- leave `GEMINI_API_KEY` unset if camera analysis is not part of the launch plan; the UI will present this clearly instead of failing
+
+## What still needs replacement before a true commercial launch
+
+This pass improves runtime safety and deployability, but a real commercial launch still needs:
+- real authentication and operator access control
+- final legal/privacy pages instead of the included placeholders
+- HTTPS, domain, and reverse-proxy hardening in the target environment
+- centralized logging, uptime monitoring, and backup strategy
+- a stronger database than SQLite if you move beyond a single-instance deployment
+- secrets management outside checked-in env files
 
 ## Recommended demo flow
 

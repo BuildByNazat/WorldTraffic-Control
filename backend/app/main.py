@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnec
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.db import close_db, init_db
+from app.db import check_db_connection, close_db, init_db
 from app.schemas import (
     AnalyticsOverview,
     AnalyticsTimeseriesResponse,
@@ -53,7 +53,8 @@ async def lifespan(app: FastAPI):
     camera_task: asyncio.Task | None = None
 
     logger.info(
-        "Starting WorldTraffic Control v0.4.0 | Provider: %s | Broadcast: %.1fs | Camera: %.0fs | Gemini: %s | DB: %s",
+        "Starting WorldTraffic Control v0.4.0 | Env: %s | Provider: %s | Broadcast: %.1fs | Camera: %.0fs | Gemini: %s | DB: %s",
+        settings.app_env,
         settings.aircraft_provider,
         settings.broadcast_interval,
         settings.camera_fetch_interval,
@@ -61,6 +62,8 @@ async def lifespan(app: FastAPI):
         settings.db_path,
     )
     logger.info("Configured CORS origins: %s", ", ".join(settings.cors_origins))
+    if settings.public_base_url:
+        logger.info("Public base URL: %s", settings.public_base_url)
 
     try:
         await init_db()
@@ -116,15 +119,33 @@ async def root():
     return {"status": "ok", "service": "WorldTraffic Control", "version": "0.4.0"}
 
 
+@app.get("/healthz", tags=["health"])
+async def healthz():
+    return {"status": "ok"}
+
+
+@app.get("/readyz", tags=["health"])
+async def readyz():
+    if not await check_db_connection():
+        raise HTTPException(status_code=503, detail="Database is not ready.")
+    return {"status": "ok"}
+
+
 @app.get("/api/status", tags=["health"], response_model=ServiceStatus)
 async def service_status():
     return ServiceStatus(
+        app_env=settings.app_env,
         aircraft_provider=factory.primary_type,
+        simulated_mode=factory.primary_type == "simulated",
+        opensky_configured=bool(
+            settings.opensky_username and settings.opensky_password
+        ),
         broadcast_interval_seconds=settings.broadcast_interval,
         camera_fetch_interval_seconds=settings.camera_fetch_interval,
         camera_count=len(get_all_cameras()),
         active_ws_connections=len(manager.active_connections),
         gemini_enabled=bool(settings.gemini_api_key),
+        public_base_url=settings.public_base_url,
         db_path=settings.db_path,
     )
 

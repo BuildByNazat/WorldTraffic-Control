@@ -3,6 +3,7 @@ services:
     build:
       context: ./backend
     environment:
+      APP_ENV: ${APP_ENV:-production}
       AIRCRAFT_PROVIDER: ${AIRCRAFT_PROVIDER:-simulated}
       BROADCAST_INTERVAL: ${BROADCAST_INTERVAL:-5.0}
       CAMERA_FETCH_INTERVAL: ${CAMERA_FETCH_INTERVAL:-60.0}
@@ -10,20 +11,40 @@ services:
       OPENSKY_USERNAME: ${OPENSKY_USERNAME:-}
       OPENSKY_PASSWORD: ${OPENSKY_PASSWORD:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
       DB_PATH: /app/data/worldtraffic.db
     volumes:
       - worldtraffic_data:/app/data
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5)"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "8080:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
 
 volumes:
