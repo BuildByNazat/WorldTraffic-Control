@@ -1,5 +1,5 @@
 /**
- * HistoryPanel - right-side sliding panel for historical data.
+ * HistoryPanel - structured review workspace for history mode.
  */
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -26,6 +26,25 @@ interface HistoryPanelProps {
   selectedEvent: SelectedEventDetail | null;
   onReplayStateChange?: (isPlaying: boolean) => void;
 }
+
+const TAB_META: Record<HistoryTab, { title: string; subtitle: string }> = {
+  analytics: {
+    title: "Analytics",
+    subtitle: "Trend summaries shaped by the active review filters.",
+  },
+  summary: {
+    title: "Overview",
+    subtitle: "A compact readout of the currently loaded review window.",
+  },
+  detections: {
+    title: "Detections",
+    subtitle: "Camera-derived events ready for search, replay, and export.",
+  },
+  aircraft: {
+    title: "Aircraft",
+    subtitle: "Recorded live-position snapshots and callsign activity.",
+  },
+};
 
 function formatTime(iso: string | null): string {
   if (!iso) return "-";
@@ -266,8 +285,8 @@ function DetectionsTab({
           {searchActive
             ? "No loaded detections match the current search."
             : hasActiveFilters
-            ? "No detections match the current filters."
-            : "No detections are available yet."}
+              ? "No detections match the current filters."
+              : "No detections are available yet."}
           <br />
           <span className="history-empty__hint">
             {searchActive
@@ -275,8 +294,8 @@ function DetectionsTab({
                 ? "Load more records or broaden the search terms."
                 : "Try broadening the search terms."
               : hasActiveFilters
-              ? "Try widening the time range or clearing a filter."
-              : "Detections appear when camera analysis is available. Live aircraft review still works without Gemini."}
+                ? "Try widening the time range or clearing a filter."
+                : "Detections appear when camera analysis is available. Live aircraft review still works without Gemini."}
           </span>
         </div>
         {hasMore && (
@@ -372,8 +391,8 @@ function AircraftTab({
           {searchActive
             ? "No loaded aircraft records match the current search."
             : hasActiveFilters
-            ? "No aircraft records match the current filters."
-            : "No aircraft observations are available yet."}
+              ? "No aircraft records match the current filters."
+              : "No aircraft observations are available yet."}
           <br />
           <span className="history-empty__hint">
             {searchActive
@@ -381,8 +400,8 @@ function AircraftTab({
                 ? "Load more records or broaden the search terms."
                 : "Try broadening the search terms."
               : hasActiveFilters
-              ? "Try widening the time range or clearing a filter."
-              : "Aircraft observations appear as the live feed records positions, including simulated demo traffic by default."}
+                ? "Try widening the time range or clearing a filter."
+                : "Aircraft observations appear as the live feed records positions, including simulated demo traffic by default."}
           </span>
         </div>
         {hasMore && (
@@ -451,6 +470,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
 }) => {
   const [tab, setTab] = useState<HistoryTab>("analytics");
   const [searchQuery, setSearchQuery] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const analytics = useAnalytics(true, filters.filters);
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const searchedDetections = useMemo(() => {
@@ -477,11 +497,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
     }
 
     return feed.aircraft.filter((record) =>
-      [
-        record.callsign ?? "",
-        record.feature_id,
-        record.source,
-      ]
+      [record.callsign ?? "", record.feature_id, record.source]
         .join(" ")
         .toLowerCase()
         .includes(normalizedSearchQuery)
@@ -511,10 +527,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
     }));
 
     return [...detectionEvents, ...aircraftEvents]
-      .sort(
-        (a, b) =>
-          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-      )
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       .map((event, index, allEvents) => ({
         ...event,
         detail: {
@@ -528,8 +541,16 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
   const replay = useReplay(replayEvents);
   const selectedReplayKey =
     selectedEvent?.kind === "history" ? selectedEvent.eventKey : null;
+  const reviewMeta = TAB_META[tab];
+  const showSearchTools = tab === "detections" || tab === "aircraft";
+  const showSummaryTools = tab === "summary";
 
-  /* Notify parent when replay starts/stops */
+  useEffect(() => {
+    if (!showSearchTools && searchQuery) {
+      setSearchQuery("");
+    }
+  }, [searchQuery, showSearchTools]);
+
   useEffect(() => {
     onReplayStateChange?.(replay.isPlaying);
   }, [replay.isPlaying, onReplayStateChange]);
@@ -648,130 +669,211 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
       </div>
 
       <div className="history-tabs" role="tablist">
-        {(["analytics", "summary", "detections", "aircraft"] as HistoryTab[]).map((nextTab) => (
-          <button
-            key={nextTab}
-            className={`history-tab${tab === nextTab ? " history-tab--active" : ""}`}
-            role="tab"
-            aria-selected={tab === nextTab}
-            onClick={() => setTab(nextTab)}
-          >
-            {nextTab === "analytics"
-              ? "Analytics"
-              : nextTab === "summary"
-              ? "Summary"
-              : nextTab === "detections"
-                ? "Detections"
-                : "Aircraft"}
-          </button>
-        ))}
+        {(["analytics", "summary", "detections", "aircraft"] as HistoryTab[]).map(
+          (nextTab) => (
+            <button
+              key={nextTab}
+              className={`history-tab${tab === nextTab ? " history-tab--active" : ""}`}
+              role="tab"
+              aria-selected={tab === nextTab}
+              onClick={() => setTab(nextTab)}
+            >
+              {TAB_META[nextTab].title}
+            </button>
+          )
+        )}
       </div>
 
-      <HistoryFilters
-        filters={filters.filters}
-        availableCameraIds={feed.cameraIds}
-        onDetectionCategoryChange={(value) =>
-          filters.updateFilter("detectionCategory", value)
-        }
-        onMinConfidenceChange={(value) => filters.updateFilter("minConfidence", value)}
-        onCameraIdChange={(value) => filters.updateFilter("cameraId", value)}
-        onAircraftSourceChange={(value) => filters.updateFilter("aircraftSource", value)}
-        onCallsignQueryChange={(value) => filters.updateFilter("callsignQuery", value)}
-        onAltitudeOnlyChange={(value) => filters.updateFilter("altitudeOnly", value)}
-        onTimeRangeChange={(value) => filters.updateFilter("timeRange", value)}
-        onReset={filters.resetFilters}
-        disabled={feed.loading}
-      />
-
-      <div className="panel-toolbar panel-toolbar--history">
-        <input
-          type="text"
-          className="panel-search"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Search label, category, camera, callsign"
-          aria-label="Search loaded history records"
-        />
-        <div className="panel-toolbar__actions">
-          <button
-            type="button"
-            className="panel-action"
-            onClick={handleExportHistoryCsv}
-            disabled={
-              searchedDetections.length === 0 && searchedAircraft.length === 0
-            }
-          >
-            Export CSV
-          </button>
-          <button
-            type="button"
-            className="panel-action"
-            onClick={handleExportHistoryJson}
-            disabled={
-              searchedDetections.length === 0 && searchedAircraft.length === 0
-            }
-          >
-            Export JSON
-          </button>
+      <div className="history-workspace">
+        <div className="history-workspace__hero">
+          <div className="history-workspace__copy">
+            <span className="history-workspace__eyebrow">{reviewMeta.title}</span>
+            <h2 className="history-workspace__title">{reviewMeta.subtitle}</h2>
+          </div>
+          <div className="history-workspace__actions">
+            <button
+              type="button"
+              className="history-workspace__toggle"
+              onClick={() => setFiltersOpen((current) => !current)}
+              aria-pressed={filtersOpen}
+            >
+              {filtersOpen ? "Hide filters" : "Show filters"}
+            </button>
+            {filters.hasActiveFilters && (
+              <span className="history-workspace__chip">Filters active</span>
+            )}
+          </div>
         </div>
-      </div>
 
-      <ReplayControls
-        hasEvents={replay.hasEvents}
-        isPlaying={replay.isPlaying}
-        currentIndex={replay.currentIndex}
-        totalEvents={replayEvents.length}
-        currentEvent={replay.currentEvent}
-        playbackSpeed={replay.playbackSpeed}
-        onTogglePlayback={replay.togglePlayback}
-        onPrevious={replay.goToPrevious}
-        onNext={replay.goToNext}
-        onScrub={replay.scrubTo}
-        onPlaybackSpeedChange={replay.setPlaybackSpeed}
-      />
+        {filtersOpen && (
+          <div className="history-workspace__filters">
+            <HistoryFilters
+              filters={filters.filters}
+              availableCameraIds={feed.cameraIds}
+              onDetectionCategoryChange={(value) =>
+                filters.updateFilter("detectionCategory", value)
+              }
+              onMinConfidenceChange={(value) =>
+                filters.updateFilter("minConfidence", value)
+              }
+              onCameraIdChange={(value) => filters.updateFilter("cameraId", value)}
+              onAircraftSourceChange={(value) =>
+                filters.updateFilter("aircraftSource", value)
+              }
+              onCallsignQueryChange={(value) =>
+                filters.updateFilter("callsignQuery", value)
+              }
+              onAltitudeOnlyChange={(value) =>
+                filters.updateFilter("altitudeOnly", value)
+              }
+              onTimeRangeChange={(value) => filters.updateFilter("timeRange", value)}
+              onReset={filters.resetFilters}
+              disabled={feed.loading}
+            />
+          </div>
+        )}
 
-      <div className="history-panel__content">
-        {tab === "analytics" && <AnalyticsDashboard analytics={analytics} />}
-        {tab === "summary" && (
-          <SummaryTab
-            summary={feed.summary}
-            loading={feed.loading}
-            error={feed.error}
-            hasActiveFilters={filters.hasActiveFilters}
-          />
-        )}
-        {tab === "detections" && (
-          <DetectionsTab
-            detections={searchedDetections}
-            loadedCount={feed.detections.length}
-            totalCount={feed.detectionsTotal}
-            hasMore={feed.hasMoreDetections}
-            onLoadMore={feed.loadMoreDetections}
-            loadingMore={feed.loadingMoreDetections}
-            loading={feed.loading}
-            error={feed.error}
-            onSelectEvent={handleReplayListSelection}
-            selectedReplayKey={selectedReplayKey}
-            hasActiveFilters={filters.hasActiveFilters}
-            searchActive={normalizedSearchQuery.length > 0}
-          />
-        )}
-        {tab === "aircraft" && (
-          <AircraftTab
-            aircraft={searchedAircraft}
-            loadedCount={feed.aircraft.length}
-            totalCount={feed.aircraftTotal}
-            hasMore={feed.hasMoreAircraft}
-            onLoadMore={feed.loadMoreAircraft}
-            loadingMore={feed.loadingMoreAircraft}
-            loading={feed.loading}
-            error={feed.error}
-            onSelectEvent={handleReplayListSelection}
-            selectedReplayKey={selectedReplayKey}
-            hasActiveFilters={filters.hasActiveFilters}
-            searchActive={normalizedSearchQuery.length > 0}
-          />
-        )}
+        <div className="history-workspace__tools">
+          <div className="history-workspace__card history-workspace__card--controls">
+            <div className="history-workspace__card-header">
+              <span className="history-section-label">Workspace</span>
+              <span className="history-workspace__caption">
+                {tab === "analytics"
+                  ? "Dashboards follow the active history filters."
+                  : tab === "summary"
+                    ? "Export the currently loaded review window."
+                    : "Search and export the loaded review set."}
+              </span>
+            </div>
+
+            {showSearchTools && (
+              <div className="panel-toolbar panel-toolbar--history">
+                <input
+                  type="text"
+                  className="panel-search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search label, category, camera, callsign"
+                  aria-label="Search loaded history records"
+                />
+                <div className="panel-toolbar__actions">
+                  <button
+                    type="button"
+                    className="panel-action"
+                    onClick={handleExportHistoryCsv}
+                    disabled={
+                      searchedDetections.length === 0 && searchedAircraft.length === 0
+                    }
+                  >
+                    Export CSV
+                  </button>
+                  <button
+                    type="button"
+                    className="panel-action"
+                    onClick={handleExportHistoryJson}
+                    disabled={
+                      searchedDetections.length === 0 && searchedAircraft.length === 0
+                    }
+                  >
+                    Export JSON
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {showSummaryTools && (
+              <div className="history-workspace__summary-actions">
+                <button
+                  type="button"
+                  className="panel-action"
+                  onClick={handleExportHistoryCsv}
+                  disabled={
+                    searchedDetections.length === 0 && searchedAircraft.length === 0
+                  }
+                >
+                  Export CSV
+                </button>
+                <button
+                  type="button"
+                  className="panel-action"
+                  onClick={handleExportHistoryJson}
+                  disabled={
+                    searchedDetections.length === 0 && searchedAircraft.length === 0
+                  }
+                >
+                  Export JSON
+                </button>
+              </div>
+            )}
+
+            {tab === "analytics" && (
+              <div className="history-workspace__note">
+                Use the review filters to reshape the analytics view without leaving
+                the drawer.
+              </div>
+            )}
+          </div>
+
+          <div className="history-workspace__card history-workspace__card--replay">
+            <ReplayControls
+              hasEvents={replay.hasEvents}
+              isPlaying={replay.isPlaying}
+              currentIndex={replay.currentIndex}
+              totalEvents={replayEvents.length}
+              currentEvent={replay.currentEvent}
+              playbackSpeed={replay.playbackSpeed}
+              onTogglePlayback={replay.togglePlayback}
+              onPrevious={replay.goToPrevious}
+              onNext={replay.goToNext}
+              onScrub={replay.scrubTo}
+              onPlaybackSpeedChange={replay.setPlaybackSpeed}
+            />
+          </div>
+        </div>
+
+        <div className="history-workspace__body">
+          {tab === "analytics" && <AnalyticsDashboard analytics={analytics} />}
+          {tab === "summary" && (
+            <SummaryTab
+              summary={feed.summary}
+              loading={feed.loading}
+              error={feed.error}
+              hasActiveFilters={filters.hasActiveFilters}
+            />
+          )}
+          {tab === "detections" && (
+            <DetectionsTab
+              detections={searchedDetections}
+              loadedCount={feed.detections.length}
+              totalCount={feed.detectionsTotal}
+              hasMore={feed.hasMoreDetections}
+              onLoadMore={feed.loadMoreDetections}
+              loadingMore={feed.loadingMoreDetections}
+              loading={feed.loading}
+              error={feed.error}
+              onSelectEvent={handleReplayListSelection}
+              selectedReplayKey={selectedReplayKey}
+              hasActiveFilters={filters.hasActiveFilters}
+              searchActive={normalizedSearchQuery.length > 0}
+            />
+          )}
+          {tab === "aircraft" && (
+            <AircraftTab
+              aircraft={searchedAircraft}
+              loadedCount={feed.aircraft.length}
+              totalCount={feed.aircraftTotal}
+              hasMore={feed.hasMoreAircraft}
+              onLoadMore={feed.loadMoreAircraft}
+              loadingMore={feed.loadingMoreAircraft}
+              loading={feed.loading}
+              error={feed.error}
+              onSelectEvent={handleReplayListSelection}
+              selectedReplayKey={selectedReplayKey}
+              hasActiveFilters={filters.hasActiveFilters}
+              searchActive={normalizedSearchQuery.length > 0}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

@@ -55,7 +55,7 @@ const ReplayControls: React.FC<ReplayControlsProps> = ({
     <div className="history-replay" aria-label="Replay controls">
       <div className="history-replay__header">
         <span className="history-section-label">Replay</span>
-        <span className="history-replay__order">Oldest to newest</span>
+        <span className="history-replay__order">Ascending timeline</span>
       </div>
 
       <div className="history-replay__main">
@@ -66,7 +66,7 @@ const ReplayControls: React.FC<ReplayControlsProps> = ({
             onClick={onPrevious}
             disabled={currentIndex <= 0}
           >
-            Prev
+            Back
           </button>
           <button
             type="button"
@@ -124,7 +124,7 @@ const ReplayControls: React.FC<ReplayControlsProps> = ({
           {currentEvent?.typeLabel ?? "Timeline"}
         </span>
         <span className="history-replay__event-label">
-          {currentEvent?.label ?? "Use the timeline or list to review an event"}
+          {currentEvent?.label ?? "Use the timeline or a list selection to review an event"}
         </span>
       </div>
     </div>

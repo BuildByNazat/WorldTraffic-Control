@@ -1,5 +1,5 @@
 /**
- * App — map-first product shell.
+ * App - map-first product shell.
  *
  * Full-bleed map with a slim icon rail on the left edge.
  * Panels open as slide-out drawers overlaying the map.
@@ -30,7 +30,6 @@ import type {
   SelectedIncidentDetail,
 } from "./types/selectedEvent";
 
-/* ── Rail panel identifiers (left-side operational tools only) ── */
 type RailPanel = "operations" | "alerts" | "incidents" | "layers";
 
 const PANEL_LABELS: Record<RailPanel, string> = {
@@ -41,10 +40,10 @@ const PANEL_LABELS: Record<RailPanel, string> = {
 };
 
 const RAIL_ICONS: Record<RailPanel, string> = {
-  operations: "⚙",
-  alerts: "🔔",
-  incidents: "📋",
-  layers: "◈",
+  operations: "OP",
+  alerts: "AL",
+  incidents: "IN",
+  layers: "LY",
 };
 
 function isSameSelection(
@@ -90,8 +89,8 @@ const App: React.FC = () => {
 
   const mapSummaryLabel =
     mode === "live"
-      ? `${aircraftCount.toLocaleString()} aircraft · ${openAlertsCount.toLocaleString()} alerts`
-      : `${historyFeed.aircraftTotal.toLocaleString()} records · ${historyFeed.detectionsTotal.toLocaleString()} detections`;
+      ? `${aircraftCount.toLocaleString()} aircraft / ${openAlertsCount.toLocaleString()} alerts`
+      : `${historyFeed.aircraftTotal.toLocaleString()} records / ${historyFeed.detectionsTotal.toLocaleString()} detections`;
 
   const linkedIncident = useMemo(() => {
     if (selectedEvent?.kind === "alert") {
@@ -106,17 +105,15 @@ const App: React.FC = () => {
     return null;
   }, [incidentsState, selectedEvent]);
 
-  /* History drawer is mode-driven: opens when entering history mode */
   useEffect(() => {
     if (mode === "history") {
       setHistoryOpen(true);
-      setActiveDrawer(null); // close any left drawer
+      setActiveDrawer(null);
     } else {
       setHistoryOpen(false);
     }
   }, [mode]);
 
-  /* Keep incident selection in sync */
   useEffect(() => {
     if (selectedEvent?.kind !== "incident") return;
     const nextIncident = incidentsState.incidents.find(
@@ -136,7 +133,6 @@ const App: React.FC = () => {
     selectIncident(nextIncident, false);
   }, [incidentsState.incidents, selectedEvent]);
 
-  /* Keep alert selection in sync */
   useEffect(() => {
     if (selectedEvent?.kind !== "alert") return;
     const nextAlert = alertsState.alerts.find((alert) => alert.id === selectedEvent.id);
@@ -170,10 +166,10 @@ const App: React.FC = () => {
 
   function handleModeChange(next: AppMode) {
     if (next === mode && next === "history") {
-      // Re-clicking Review while already in history mode: toggle the drawer
       setHistoryOpen((prev) => !prev);
       return;
     }
+
     setMode(next);
     clearSelection();
   }
@@ -188,8 +184,8 @@ const App: React.FC = () => {
 
   function toggleDrawer(panel: RailPanel) {
     setActiveDrawer((current) => {
-      if (current === panel) return null; // close if already open
-      setHistoryOpen(false); // close history when opening a left drawer
+      if (current === panel) return null;
+      setHistoryOpen(false);
       return panel;
     });
   }
@@ -259,21 +255,20 @@ const App: React.FC = () => {
     }
   }
 
-  /* Drawer visibility */
   const isLeftDrawer = activeDrawer !== null;
   const isRightDrawer = historyOpen;
   const hideEventDetail = isReplayPlaying;
 
-  /* Status chip position class */
   const statusClasses = [
     "app-map-stage__status",
     isLeftDrawer ? "app-map-stage__status--left-open" : "",
     isRightDrawer ? "app-map-stage__status--right-open" : "",
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div className="app-shell">
-      {/* ── Header ── */}
       <header className="app-header">
         <div className="app-header__brand">
           <span className="logo" aria-hidden="true">
@@ -293,15 +288,13 @@ const App: React.FC = () => {
             onClick={toggleTheme}
             aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
           >
-            {theme === "dark" ? "☀" : "☾"}
+            {theme === "dark" ? "Dark" : "Light"}
           </button>
           <ModeToggle mode={mode} onModeChange={handleModeChange} />
         </div>
       </header>
 
-      {/* ── Main: full-bleed map + overlays ── */}
       <main className="app-main">
-        {/* Map fills entire area */}
         <div className="app-map-stage">
           <LiveMap
             data={data}
@@ -322,13 +315,11 @@ const App: React.FC = () => {
           />
         </div>
 
-        {/* Status pill */}
         <div className={statusClasses}>
           <span className="app-map-stage__status-dot" aria-hidden="true" />
           <span>{mapSummaryLabel}</span>
         </div>
 
-        {/* ── Icon rail ── */}
         <nav className="rail" aria-label="Tools">
           {(["operations", "alerts", "incidents", "layers"] as RailPanel[]).map(
             (panel) => (
@@ -352,7 +343,6 @@ const App: React.FC = () => {
           )}
         </nav>
 
-        {/* ── Left drawer (operations / alerts / incidents / layers) ── */}
         {isLeftDrawer && (
           <aside className="drawer" aria-label={PANEL_LABELS[activeDrawer!]}>
             <div className="drawer__header">
@@ -363,10 +353,16 @@ const App: React.FC = () => {
                 onClick={() => setActiveDrawer(null)}
                 aria-label="Hide panel"
               >
-                ◂
+                {"<"}
               </button>
             </div>
-            <div className={`drawer__body${activeDrawer === "operations" || activeDrawer === "layers" ? " drawer__body--padded" : ""}`}>
+            <div
+              className={`drawer__body${
+                activeDrawer === "operations" || activeDrawer === "layers"
+                  ? " drawer__body--padded"
+                  : ""
+              }`}
+            >
               {activeDrawer === "operations" && (
                 <StatusPanel
                   status={status}
@@ -407,9 +403,8 @@ const App: React.FC = () => {
           </aside>
         )}
 
-        {/* ── Right drawer (history) ── */}
         {isRightDrawer && (
-          <aside className="drawer drawer--right" aria-label="History & Review">
+          <aside className="drawer drawer--right" aria-label="History and review">
             <div className="drawer__header">
               <span className="drawer__title">History &amp; Review</span>
               <button
@@ -418,7 +413,7 @@ const App: React.FC = () => {
                 onClick={() => setHistoryOpen(false)}
                 aria-label="Hide review"
               >
-                ▸
+                {">"}
               </button>
             </div>
             <div className="drawer__body">
@@ -433,7 +428,6 @@ const App: React.FC = () => {
           </aside>
         )}
 
-        {/* Edge handle — shows when in history mode but drawer is hidden */}
         {mode === "history" && !historyOpen && (
           <button
             type="button"
@@ -441,11 +435,10 @@ const App: React.FC = () => {
             onClick={() => setHistoryOpen(true)}
             aria-label="Show review"
           >
-            ◂
+            {"<"}
           </button>
         )}
 
-        {/* ── Event detail ── */}
         {!hideEventDetail && (
           <EventDetailDrawer
             selectedEvent={selectedEvent}
