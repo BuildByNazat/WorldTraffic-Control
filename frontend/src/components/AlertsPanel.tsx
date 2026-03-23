@@ -166,7 +166,7 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
         <div className="alerts-panel__state">
           {variant === "compact"
             ? "No open alerts in the current live view."
-            : "No active alerts are available for review."}
+            : "No active alerts are available for review yet."}
         </div>
       )}
 

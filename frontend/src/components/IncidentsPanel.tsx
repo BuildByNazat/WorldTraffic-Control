@@ -125,7 +125,8 @@ const IncidentsPanel: React.FC<IncidentsPanelProps> = ({
       )}
       {!loading && incidents.length === 0 && (
         <div className="incidents-panel__state">
-          No incidents have been promoted yet.
+          No incidents have been promoted yet. Create one from an alert when you
+          want to start a review case.
         </div>
       )}
       {!loading && incidents.length > 0 && filteredIncidents.length === 0 && (

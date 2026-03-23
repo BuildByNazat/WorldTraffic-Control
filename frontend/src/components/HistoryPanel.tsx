@@ -118,7 +118,17 @@ function SummaryTab({
 }) {
   if (loading) return <div className="history-empty">Loading summary...</div>;
   if (error) return <div className="history-error">{error}</div>;
-  if (!summary) return <div className="history-empty">No history is available yet.</div>;
+  if (!summary) {
+    return (
+      <div className="history-empty">
+        No history is available yet.
+        <br />
+        <span className="history-empty__hint">
+          Stay in live mode for a moment and the review timeline will begin to populate.
+        </span>
+      </div>
+    );
+  }
 
   const categories = Object.entries(summary.detections_by_category).sort(
     (a, b) => b[1] - a[1]
@@ -265,7 +275,7 @@ function DetectionsTab({
                 : "Try broadening the search terms."
               : hasActiveFilters
               ? "Try widening the time range or clearing a filter."
-              : "Detections appear when the camera analysis pipeline records a result."}
+              : "Detections appear when camera analysis is available. Live aircraft review still works without Gemini."}
           </span>
         </div>
         {hasMore && (
@@ -371,7 +381,7 @@ function AircraftTab({
                 : "Try broadening the search terms."
               : hasActiveFilters
               ? "Try widening the time range or clearing a filter."
-              : "Aircraft observations appear when the live feed records a position."}
+              : "Aircraft observations appear as the live feed records positions, including simulated demo traffic by default."}
           </span>
         </div>
         {hasMore && (

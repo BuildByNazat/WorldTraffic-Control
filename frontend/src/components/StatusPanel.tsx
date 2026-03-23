@@ -73,7 +73,7 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
       <div className="status-panel__row">
         <span className="status-panel__label">Last update</span>
         <span className="status-panel__value">
-          {lastUpdate ? formatTime(lastUpdate) : "Awaiting feed"}
+          {lastUpdate ? formatTime(lastUpdate) : "Awaiting live feed"}
         </span>
       </div>
     </div>

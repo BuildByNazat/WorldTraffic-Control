@@ -1,0 +1,30 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    environment:
+      AIRCRAFT_PROVIDER: ${AIRCRAFT_PROVIDER:-simulated}
+      BROADCAST_INTERVAL: ${BROADCAST_INTERVAL:-5.0}
+      CAMERA_FETCH_INTERVAL: ${CAMERA_FETCH_INTERVAL:-60.0}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENSKY_USERNAME: ${OPENSKY_USERNAME:-}
+      OPENSKY_PASSWORD: ${OPENSKY_PASSWORD:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      DB_PATH: /app/data/worldtraffic.db
+    volumes:
+      - worldtraffic_data:/app/data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  worldtraffic_data:
