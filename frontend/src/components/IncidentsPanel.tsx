@@ -84,7 +84,6 @@ const IncidentsPanel: React.FC<IncidentsPanelProps> = ({
       <div className="incidents-panel__header">
         <div className="incidents-panel__heading">
           <span className="incidents-panel__title">Incidents</span>
-          <span className="incidents-panel__subtitle">Review queue</span>
         </div>
         <button
           type="button"

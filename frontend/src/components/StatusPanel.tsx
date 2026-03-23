@@ -78,10 +78,7 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
 
   return (
     <div className="status-panel" role="status" aria-live="polite">
-      <div className="status-panel__title">Tracking Status</div>
-      <div className="status-panel__subtitle">
-        Live positions and service readiness where upstream data is available
-      </div>
+      <div className="status-panel__title">Status</div>
 
       <div className="status-panel__row">
         <span className="status-panel__label">Feed</span>
@@ -90,8 +87,6 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
           {STATUS_LABEL[status]}
         </span>
       </div>
-
-      <hr className="status-panel__divider" />
 
       <div className="status-panel__row">
         <span className="status-panel__label">Aircraft</span>
@@ -104,9 +99,9 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
       </div>
 
       <div className="status-panel__row">
-        <span className="status-panel__label">Last update</span>
+        <span className="status-panel__label">Updated</span>
         <span className="status-panel__value">
-          {lastUpdate ? formatTime(lastUpdate) : "Awaiting live feed"}
+          {lastUpdate ? formatTime(lastUpdate) : "Awaiting"}
         </span>
       </div>
 
@@ -123,13 +118,13 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
       </div>
 
       <div className="status-panel__row">
-        <span className="status-panel__label">Environment</span>
+        <span className="status-panel__label">Env</span>
         <span className="status-panel__value">{environmentLabel}</span>
       </div>
 
       {(serviceStatusLoading || serviceStatusError) && (
         <div className="status-panel__meta">
-          {serviceStatusLoading ? "Refreshing system status..." : serviceStatusError}
+          {serviceStatusLoading ? "Refreshing..." : serviceStatusError}
         </div>
       )}
 

@@ -30,10 +30,7 @@ const LayerControls: React.FC<LayerControlsProps> = ({
   return (
     <aside className="layer-controls" aria-label="Map layer controls">
       <div className="layer-controls__header">
-        <div className="layer-controls__heading">
-          <span className="layer-controls__title">Layers</span>
-          <span className="layer-controls__subtitle">Map visibility</span>
-        </div>
+        <span className="layer-controls__title">Layers</span>
       </div>
 
       <div className="layer-controls__body">

@@ -285,17 +285,7 @@ const App: React.FC = () => {
             {theme === "dark" ? "Light theme" : "Dark theme"}
           </button>
 
-          <nav className="app-header__links" aria-label="Product information">
-            <a href="/about.html" target="_blank" rel="noreferrer">
-              About
-            </a>
-            <a href="/privacy.html" target="_blank" rel="noreferrer">
-              Privacy
-            </a>
-            <a href="/terms.html" target="_blank" rel="noreferrer">
-              Terms
-            </a>
-          </nav>
+
 
           <ModeToggle mode={mode} onModeChange={handleModeChange} />
         </div>
@@ -347,19 +337,9 @@ const App: React.FC = () => {
           {workspaceOpen && (
             <div className="app-sidebar__content">
               <div className="app-sidebar__panel-header">
-                <div className="app-sidebar__panel-copy">
-                  <span className="app-sidebar__panel-eyebrow">Workspace</span>
-                  <span className="app-sidebar__panel-title">
-                    {WORKSPACE_LABELS[workspaceSection]}
-                  </span>
-                  <span className="app-sidebar__panel-subtitle">
-                    {workspaceSection === "operations"
-                      ? "System status, layers, and live-readiness controls"
-                      : workspaceSection === "alerts"
-                        ? "Active alert review and operator triage"
-                        : "Promoted incidents and case follow-up"}
-                  </span>
-                </div>
+                <span className="app-sidebar__panel-title">
+                  {WORKSPACE_LABELS[workspaceSection]}
+                </span>
                 <button
                   type="button"
                   className="app-sidebar__collapse"
@@ -410,63 +390,32 @@ const App: React.FC = () => {
         </aside>
 
         <section className="app-map-shell">
-          <div className="app-map-toolbar">
-            <div className="app-map-toolbar__text">
-              <span className="app-map-toolbar__eyebrow">
-                {mode === "live" ? "Live tracking" : "Recorded review"}
-              </span>
-              <span className="app-map-toolbar__title">
-                Unified map-first tracking where panels stay contextual and secondary.
-              </span>
-            </div>
-            <div className="app-map-toolbar__metrics" aria-label="Tracking overview">
-              <div className="app-map-toolbar__metric">
-                <span className="app-map-toolbar__metric-value">
-                  {mode === "live"
-                    ? aircraftCount.toLocaleString()
-                    : historyFeed.aircraftTotal.toLocaleString()}
-                </span>
-                <span className="app-map-toolbar__metric-label">
-                  {mode === "live" ? "Tracked aircraft" : "Aircraft records"}
-                </span>
-              </div>
-              <div className="app-map-toolbar__metric">
-                <span className="app-map-toolbar__metric-value">
-                  {mode === "live"
-                    ? openAlertsCount.toLocaleString()
-                    : historyFeed.detectionsTotal.toLocaleString()}
-                </span>
-                <span className="app-map-toolbar__metric-label">
-                  {mode === "live" ? "Open alerts" : "Detections"}
-                </span>
-              </div>
-            </div>
-            <div className="app-map-toolbar__actions">
-              {!workspaceOpen && (
-                <button
-                  type="button"
-                  className="app-map-toolbar__button"
-                  onClick={() => setWorkspaceOpen(true)}
-                >
-                  Open workspace
-                </button>
-              )}
-              {mode === "history" && !historyOpen && (
-                <button
-                  type="button"
-                  className="app-map-toolbar__button"
-                  onClick={() => setHistoryOpen(true)}
-                >
-                  Open review
-                </button>
-              )}
-            </div>
-          </div>
-
           <div className="app-map-stage">
             <div className="app-map-stage__status">
               <span className="app-map-stage__status-dot" aria-hidden="true" />
               <span>{mapSummaryLabel}</span>
+              {(!workspaceOpen || (mode === "history" && !historyOpen)) && (
+                <span className="app-map-stage__actions">
+                  {!workspaceOpen && (
+                    <button
+                      type="button"
+                      className="app-header__button"
+                      onClick={() => setWorkspaceOpen(true)}
+                    >
+                      Workspace
+                    </button>
+                  )}
+                  {mode === "history" && !historyOpen && (
+                    <button
+                      type="button"
+                      className="app-header__button"
+                      onClick={() => setHistoryOpen(true)}
+                    >
+                      Review
+                    </button>
+                  )}
+                </span>
+              )}
             </div>
             <LiveMap
               data={data}

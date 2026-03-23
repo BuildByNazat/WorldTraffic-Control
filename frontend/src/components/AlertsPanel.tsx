@@ -83,9 +83,6 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
           <span className="alerts-panel__title">
             {variant === "compact" ? "Live Alerts" : "Alerts"}
           </span>
-          {variant === "compact" && (
-            <span className="alerts-panel__subtitle">Current alert activity</span>
-          )}
         </div>
         <button
           type="button"
