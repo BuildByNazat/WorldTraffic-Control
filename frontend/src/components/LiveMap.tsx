@@ -281,7 +281,6 @@ function HighlightLayer({ location, variant, enabled }: HighlightLayerProps) {
     if (!location || !variant || !enabled) return;
 
     const color = variant === "replay" ? "#38bdf8" : "#facc15";
-    const subtitle = variant === "replay" ? "Replay selection" : "Selected item";
 
     const circle = L.circleMarker([location.lat, location.lon], {
       radius: variant === "replay" ? 13 : 14,
@@ -291,17 +290,24 @@ function HighlightLayer({ location, variant, enabled }: HighlightLayerProps) {
       fillColor: color,
       fillOpacity: 0.18,
       className: "highlight-ring",
-    })
-      .addTo(map)
-      .bindPopup(
-        `<div class="aircraft-popup"><h3>${location.label}</h3><p class="map-popup__note">${subtitle}</p></div>`
-      )
-      .openPopup();
+    }).addTo(map);
 
     circleRef.current = circle;
-    map.flyTo([location.lat, location.lon], Math.max(map.getZoom(), 7), {
-      duration: 1.2,
-    });
+
+    if (variant === "replay") {
+      // Gentle follow during replay — no zoom change, no popup
+      map.panTo([location.lat, location.lon], { animate: true, duration: 0.4 });
+    } else {
+      // Manual selection — fly in and open popup
+      circle
+        .bindPopup(
+          `<div class="aircraft-popup"><h3>${location.label}</h3><p class="map-popup__note">Selected item</p></div>`
+        )
+        .openPopup();
+      map.flyTo([location.lat, location.lon], Math.max(map.getZoom(), 7), {
+        duration: 1.2,
+      });
+    }
 
     return () => {
       circle.remove();

@@ -68,6 +68,7 @@ const App: React.FC = () => {
   const [highlight, setHighlight] = useState<HighlightLocation | null>(null);
   const [activeDrawer, setActiveDrawer] = useState<RailPanel | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [isReplayPlaying, setIsReplayPlaying] = useState(false);
 
   const historyFilters = useFilteredHistory();
   const historyFeed = useHistoryFeed(mode === "history", historyFilters.filters);
@@ -168,6 +169,11 @@ const App: React.FC = () => {
   }
 
   function handleModeChange(next: AppMode) {
+    if (next === mode && next === "history") {
+      // Re-clicking Review while already in history mode: reopen the drawer
+      setHistoryOpen(true);
+      return;
+    }
     setMode(next);
     clearSelection();
   }
@@ -256,6 +262,14 @@ const App: React.FC = () => {
   /* Drawer visibility */
   const isLeftDrawer = activeDrawer !== null;
   const isRightDrawer = historyOpen;
+  const hideEventDetail = isReplayPlaying;
+
+  /* Status chip position class */
+  const statusClasses = [
+    "app-map-stage__status",
+    isLeftDrawer ? "app-map-stage__status--left-open" : "",
+    isRightDrawer ? "app-map-stage__status--right-open" : "",
+  ].filter(Boolean).join(" ");
 
   return (
     <div className="app-shell">
@@ -309,7 +323,7 @@ const App: React.FC = () => {
         </div>
 
         {/* Status pill */}
-        <div className="app-map-stage__status">
+        <div className={statusClasses}>
           <span className="app-map-stage__status-dot" aria-hidden="true" />
           <span>{mapSummaryLabel}</span>
         </div>
@@ -347,8 +361,9 @@ const App: React.FC = () => {
                 type="button"
                 className="drawer__close"
                 onClick={() => setActiveDrawer(null)}
+                aria-label="Hide panel"
               >
-                ✕
+                ◂
               </button>
             </div>
             <div className={`drawer__body${activeDrawer === "operations" || activeDrawer === "layers" ? " drawer__body--padded" : ""}`}>
@@ -401,8 +416,9 @@ const App: React.FC = () => {
                 type="button"
                 className="drawer__close"
                 onClick={() => setHistoryOpen(false)}
+                aria-label="Hide review"
               >
-                ✕
+                ▸
               </button>
             </div>
             <div className="drawer__body">
@@ -411,25 +427,28 @@ const App: React.FC = () => {
                 filters={historyFilters}
                 onSelectEvent={handleSelectEvent}
                 selectedEvent={selectedEvent}
+                onReplayStateChange={setIsReplayPlaying}
               />
             </div>
           </aside>
         )}
 
         {/* ── Event detail ── */}
-        <EventDetailDrawer
-          selectedEvent={selectedEvent}
-          onClose={clearSelection}
-          linkedIncident={linkedIncident}
-          onCreateIncidentFromAlert={() => {
-            void handleCreateIncidentFromSelectedAlert();
-          }}
-          onOpenLinkedIncident={() => {
-            if (linkedIncident) {
-              selectIncident(linkedIncident, false);
-            }
-          }}
-        />
+        {!hideEventDetail && (
+          <EventDetailDrawer
+            selectedEvent={selectedEvent}
+            onClose={clearSelection}
+            linkedIncident={linkedIncident}
+            onCreateIncidentFromAlert={() => {
+              void handleCreateIncidentFromSelectedAlert();
+            }}
+            onOpenLinkedIncident={() => {
+              if (linkedIncident) {
+                selectIncident(linkedIncident, false);
+              }
+            }}
+          />
+        )}
       </main>
     </div>
   );

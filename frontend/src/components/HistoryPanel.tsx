@@ -24,6 +24,7 @@ interface HistoryPanelProps {
   filters: FilteredHistoryState;
   onSelectEvent: (event: SelectedEventDetail | null) => void;
   selectedEvent: SelectedEventDetail | null;
+  onReplayStateChange?: (isPlaying: boolean) => void;
 }
 
 function formatTime(iso: string | null): string {
@@ -446,6 +447,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
   filters,
   onSelectEvent,
   selectedEvent,
+  onReplayStateChange,
 }) => {
   const [tab, setTab] = useState<HistoryTab>("analytics");
   const [searchQuery, setSearchQuery] = useState("");
@@ -526,6 +528,11 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
   const replay = useReplay(replayEvents);
   const selectedReplayKey =
     selectedEvent?.kind === "history" ? selectedEvent.eventKey : null;
+
+  /* Notify parent when replay starts/stops */
+  useEffect(() => {
+    onReplayStateChange?.(replay.isPlaying);
+  }, [replay.isPlaying, onReplayStateChange]);
 
   useEffect(() => {
     if (selectedEvent?.kind !== "history") return;
