@@ -1,6 +1,5 @@
 /**
- * StatusPanel — floating overlay showing WebSocket status, aircraft count,
- * camera detection count, and last update time.
+ * StatusPanel - floating overlay showing feed status and current live counts.
  */
 
 import React from "react";
@@ -15,7 +14,7 @@ interface StatusPanelProps {
 
 const STATUS_LABEL: Record<WsStatus, string> = {
   connected: "Connected",
-  connecting: "Connecting…",
+  connecting: "Connecting...",
   disconnected: "Disconnected",
 };
 
@@ -48,11 +47,11 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
 }) => {
   return (
     <div className="status-panel" role="status" aria-live="polite">
-      <div className="status-panel__title">Live Feed</div>
+      <div className="status-panel__title">Live Operations</div>
+      <div className="status-panel__subtitle">Current transport activity</div>
 
-      {/* WebSocket connection status */}
       <div className="status-panel__row">
-        <span className="status-panel__label">WebSocket</span>
+        <span className="status-panel__label">Feed</span>
         <span className={`status-panel__value ${STATUS_CLASS[status]}`}>
           <span className={DOT_CLASS[status]} aria-hidden="true" />
           {STATUS_LABEL[status]}
@@ -61,25 +60,20 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
 
       <hr className="status-panel__divider" />
 
-      {/* Aircraft tracked (excludes camera detections) */}
       <div className="status-panel__row">
         <span className="status-panel__label">Aircraft</span>
         <span className="status-panel__value">{aircraftCount}</span>
       </div>
 
-      {/* Gemini camera detections */}
       <div className="status-panel__row">
         <span className="status-panel__label">Detections</span>
-        <span className="status-panel__value">
-          {detectionCount > 0 ? detectionCount : "—"}
-        </span>
+        <span className="status-panel__value">{detectionCount}</span>
       </div>
 
-      {/* Last data update time */}
       <div className="status-panel__row">
         <span className="status-panel__label">Last update</span>
         <span className="status-panel__value">
-          {lastUpdate ? formatTime(lastUpdate) : "—"}
+          {lastUpdate ? formatTime(lastUpdate) : "Awaiting feed"}
         </span>
       </div>
     </div>

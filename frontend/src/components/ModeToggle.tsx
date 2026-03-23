@@ -23,14 +23,17 @@ const ModeToggle: React.FC<ModeToggleProps> = ({ mode, onModeChange }) => {
         aria-pressed={mode === "live"}
       >
         <span className="mode-toggle__dot mode-toggle__dot--live" aria-hidden="true" />
-        Live
+        <span className="mode-toggle__label">Live</span>
       </button>
       <button
         className={`mode-toggle__btn${mode === "history" ? " mode-toggle__btn--active" : ""}`}
         onClick={() => onModeChange("history")}
         aria-pressed={mode === "history"}
       >
-        History
+        <span className="mode-toggle__icon" aria-hidden="true">
+          T
+        </span>
+        <span className="mode-toggle__label">History</span>
       </button>
     </div>
   );

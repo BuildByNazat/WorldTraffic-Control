@@ -30,9 +30,9 @@ L.Icon.Default.mergeOptions({
 function createAircraftIcon(heading: number): L.DivIcon {
   return L.divIcon({
     className: "",
-    html: `<div class="aircraft-icon" style="transform: rotate(${heading}deg)"><span>&#9992;</span></div>`,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
+    html: `<div class="aircraft-icon"><span style="transform: rotate(${heading}deg)">&#9992;</span></div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
     popupAnchor: [0, -14],
   });
 }
@@ -50,9 +50,9 @@ function createDetectionIcon(category: string): L.DivIcon {
   const color = DETECTION_COLORS[category] ?? DETECTION_COLORS.unknown;
   return L.divIcon({
     className: "",
-    html: `<div class="detection-icon" style="background:${color}" title="${category}"></div>`,
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
+    html: `<div class="detection-icon" style="background:${color}" title="${category}"><span></span></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
     popupAnchor: [0, -10],
   });
 }
@@ -72,9 +72,9 @@ function createAlertIcon(
     className: "",
     html: `<div class="alert-marker${
       selected ? " alert-marker--selected" : ""
-    }" style="--alert-color:${color}"></div>`,
-    iconSize: selected ? [18, 18] : [14, 14],
-    iconAnchor: selected ? [9, 9] : [7, 7],
+    }" style="--alert-color:${color}"><span></span></div>`,
+    iconSize: selected ? [20, 20] : [16, 16],
+    iconAnchor: selected ? [10, 10] : [8, 8],
     popupAnchor: [0, -10],
   });
 }
@@ -339,7 +339,7 @@ const LiveMap: React.FC<LiveMapProps> = ({
 
   return (
     <MapContainer
-      className="map-container"
+      className="map-container map-container--dark"
       center={[20, 0]}
       zoom={3}
       minZoom={2}
@@ -347,8 +347,8 @@ const LiveMap: React.FC<LiveMapProps> = ({
       worldCopyJump
     >
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; OpenStreetMap contributors &copy; CARTO'
+        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
       />
       <LiveMarkersLayer data={data} layers={layerState} />
       <AlertMarkersLayer

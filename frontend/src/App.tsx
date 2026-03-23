@@ -184,10 +184,17 @@ const App: React.FC = () => {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <span className="logo" aria-hidden="true">
-          WTC
-        </span>
-        <h1>WorldTraffic Control</h1>
+        <div className="app-header__brand">
+          <span className="logo" aria-hidden="true">
+            WTC
+          </span>
+          <div className="app-header__titles">
+            <h1>WorldTraffic Control</h1>
+            <span className="app-header__tagline">
+              Live operations, review, and situational awareness
+            </span>
+          </div>
+        </div>
         <div className="app-header__spacer" />
         <ModeToggle mode={mode} onModeChange={handleModeChange} />
       </header>
