@@ -10,12 +10,18 @@ from pydantic import BaseModel, Field
 
 class AircraftProperties(BaseModel):
     id: str
-    callsign: str
+    callsign: Optional[str] = None
     altitude: float = Field(..., description="Altitude in feet")
     heading: float = Field(..., ge=0, lt=360)
     speed: float = Field(..., description="Speed in knots")
-    source: Literal["simulated", "opensky"] = "simulated"
+    source: str = "simulated"
     category: Literal["aircraft"] = "aircraft"
+    observed_at: Optional[datetime] = None
+    route_origin: Optional[str] = None
+    route_destination: Optional[str] = None
+    provider_name: Optional[str] = None
+    freshness_seconds: Optional[float] = None
+    stale: bool = False
 
 
 class AircraftGeometry(BaseModel):
@@ -85,6 +91,14 @@ class ServiceStatus(BaseModel):
     status: Literal["ok"] = "ok"
     app_env: str
     aircraft_provider: str
+    aviation_data_mode: str
+    aviation_provider: str
+    aviation_provider_label: str
+    aviation_active_source: str
+    aviation_provider_healthy: bool
+    aviation_provider_degraded: bool
+    aviation_provider_message: Optional[str] = None
+    aviation_last_snapshot_at: Optional[datetime] = None
     simulated_mode: bool
     opensky_configured: bool
     broadcast_interval_seconds: float

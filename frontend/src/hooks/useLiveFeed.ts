@@ -15,12 +15,18 @@ import { WS_URL, WS_RECONNECT_DELAY_MS } from "../config";
 
 export interface AircraftProperties {
   id: string;
-  callsign: string;
+  callsign: string | null;
   altitude: number;
   heading: number;
   speed: number;
-  source: "simulated" | "opensky";
+  source: string;
   category: "aircraft";
+  observed_at?: string | null;
+  route_origin?: string | null;
+  route_destination?: string | null;
+  provider_name?: string | null;
+  freshness_seconds?: number | null;
+  stale?: boolean;
 }
 
 export interface DetectionProperties {

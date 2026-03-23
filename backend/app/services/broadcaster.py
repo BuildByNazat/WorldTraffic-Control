@@ -28,6 +28,7 @@ from fastapi import WebSocket
 from app.config import settings
 from app.schemas import AircraftFeature, CombinedFeatureCollection, DetectionFeature
 from app.services.providers.factory import factory
+from app.services.providers.models import to_aircraft_feature_collection
 from app.services.camera_registry import get_all_detections
 
 logger = logging.getLogger(__name__)
@@ -83,7 +84,8 @@ async def build_combined_snapshot() -> CombinedFeatureCollection:
     Fetch the latest aircraft snapshot and merge in all current camera detections.
     Returns a CombinedFeatureCollection for broadcasting or HTTP response.
     """
-    aircraft_snapshot = await factory.get_snapshot()
+    aviation_snapshot = await factory.get_snapshot()
+    aircraft_snapshot = to_aircraft_feature_collection(aviation_snapshot)
     detections = get_all_detections()
     combined_features = list(aircraft_snapshot.features) + list(detections)
     return CombinedFeatureCollection(features=combined_features)

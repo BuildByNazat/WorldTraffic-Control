@@ -5,13 +5,13 @@ Moves the existing simulation logic into a provider class.
 
 import math
 import random
+from datetime import datetime, timezone
 from typing import List
 
-from app.schemas import (
-    AircraftFeature,
-    AircraftFeatureCollection,
-    AircraftGeometry,
-    AircraftProperties,
+from app.services.providers.models import (
+    AviationFlight,
+    AviationProviderStatus,
+    AviationSnapshot,
 )
 from app.services.providers.base import BaseAircraftProvider
 
@@ -20,6 +20,9 @@ class SimulatedProvider(BaseAircraftProvider):
     """
     Fake aircraft data generator with smooth movement over time.
     """
+
+    provider_key = "simulated"
+    provider_label = "Simulated Demo Feed"
 
     def __init__(self, min_aircraft: int = 8, max_aircraft: int = 15) -> None:
         self._fleet: List[dict] = []
@@ -73,25 +76,43 @@ class SimulatedProvider(BaseAircraftProvider):
 
         return {**ac, "lat": new_lat, "lon": new_lon, "heading": heading, "altitude": altitude}
 
-    async def get_snapshot(self) -> AircraftFeatureCollection:
+    async def get_snapshot(self) -> AviationSnapshot:
+        now = datetime.now(timezone.utc)
+
         if not self._fleet:
             self._init_fleet()
         else:
             self._fleet = [self._move_aircraft(ac) for ac in self._fleet]
 
-        features: List[AircraftFeature] = []
+        flights: List[AviationFlight] = []
         for ac in self._fleet:
-            feature = AircraftFeature(
-                geometry=AircraftGeometry(coordinates=[ac["lon"], ac["lat"]]),
-                properties=AircraftProperties(
-                    id=ac["id"],
+            flights.append(
+                AviationFlight(
+                    stable_id=ac["id"],
                     callsign=ac["callsign"],
-                    altitude=round(ac["altitude"], 0),
-                    heading=round(ac["heading"], 1),
-                    speed=round(ac["speed"], 1),
-                    source="simulated",
-                ),
+                    flight_identifier=ac["callsign"],
+                    latitude=ac["lat"],
+                    longitude=ac["lon"],
+                    altitude_ft=round(ac["altitude"], 0),
+                    heading_deg=round(ac["heading"], 1),
+                    ground_speed_kts=round(ac["speed"], 1),
+                    observed_at=now,
+                    provider=self.provider_key,
+                    freshness_seconds=0.0,
+                )
             )
-            features.append(feature)
 
-        return AircraftFeatureCollection(features=features)
+        return AviationSnapshot(
+            flights=flights,
+            provider_status=AviationProviderStatus(
+                provider_key=self.provider_key,
+                provider_label=self.provider_label,
+                mode="demo",
+                checked_at=now,
+                healthy=True,
+                degraded=False,
+                message="Simulated aircraft feed is active.",
+                last_snapshot_at=now,
+            ),
+            generated_at=now,
+        )

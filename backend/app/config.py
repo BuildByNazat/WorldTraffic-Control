@@ -94,6 +94,11 @@ def _resolve_db_path(raw_path: Optional[str]) -> str:
 class Settings:
     app_env: str = "development"
     aircraft_provider: str = "simulated"
+    aviation_data_mode: str = "demo"
+    aviation_provider: str = "simulated"
+    commercial_provider_name: Optional[str] = None
+    commercial_api_base_url: Optional[str] = None
+    commercial_api_key: Optional[str] = None
     opensky_username: Optional[str] = None
     opensky_password: Optional[str] = None
     broadcast_interval: float = 5.0
@@ -121,13 +126,28 @@ def _load_settings() -> Settings:
 
     app_env = _get_choice("APP_ENV", "development", {"development", "production"})
 
-    provider = (os.getenv("AIRCRAFT_PROVIDER", "simulated")).strip().lower()
-    if provider not in {"simulated", "opensky"}:
+    provider = (
+        _get_optional_str("AVIATION_PROVIDER")
+        or _get_optional_str("AIRCRAFT_PROVIDER")
+        or "simulated"
+    ).lower()
+    if provider not in {"simulated", "opensky", "commercial_stub"}:
         logger.warning(
-            "Unsupported AIRCRAFT_PROVIDER=%r. Falling back to 'simulated'.",
+            "Unsupported aviation provider %r. Falling back to 'simulated'.",
             provider,
         )
         provider = "simulated"
+
+    aviation_data_mode = _get_choice(
+        "AVIATION_DATA_MODE",
+        "demo" if provider == "simulated" else "provider",
+        {"demo", "provider"},
+    )
+    if aviation_data_mode == "provider" and provider == "simulated":
+        logger.info(
+            "AVIATION_DATA_MODE=provider with AVIATION_PROVIDER=simulated. "
+            "Running in demo mode until a real provider is configured."
+        )
 
     if provider == "opensky" and not _get_optional_str("OPENSKY_USERNAME"):
         logger.info("OpenSky is enabled without credentials. Anonymous rate limits apply.")
@@ -142,6 +162,11 @@ def _load_settings() -> Settings:
     return Settings(
         app_env=app_env,
         aircraft_provider=provider,
+        aviation_data_mode=aviation_data_mode,
+        aviation_provider=provider,
+        commercial_provider_name=_get_optional_str("COMMERCIAL_PROVIDER_NAME"),
+        commercial_api_base_url=_get_optional_str("COMMERCIAL_API_BASE_URL"),
+        commercial_api_key=_get_optional_str("COMMERCIAL_API_KEY"),
         opensky_username=_get_optional_str("OPENSKY_USERNAME"),
         opensky_password=_get_optional_str("OPENSKY_PASSWORD"),
         broadcast_interval=_get_float("BROADCAST_INTERVAL", 5.0, minimum=0.25),
@@ -157,6 +182,11 @@ settings = _load_settings()
 
 APP_ENV: str = settings.app_env
 AIRCRAFT_PROVIDER: str = settings.aircraft_provider
+AVIATION_DATA_MODE: str = settings.aviation_data_mode
+AVIATION_PROVIDER: str = settings.aviation_provider
+COMMERCIAL_PROVIDER_NAME: Optional[str] = settings.commercial_provider_name
+COMMERCIAL_API_BASE_URL: Optional[str] = settings.commercial_api_base_url
+COMMERCIAL_API_KEY: Optional[str] = settings.commercial_api_key
 OPENSKY_USERNAME: Optional[str] = settings.opensky_username
 OPENSKY_PASSWORD: Optional[str] = settings.opensky_password
 BROADCAST_INTERVAL: float = settings.broadcast_interval

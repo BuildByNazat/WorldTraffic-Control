@@ -53,9 +53,10 @@ async def lifespan(app: FastAPI):
     camera_task: asyncio.Task | None = None
 
     logger.info(
-        "Starting WorldTraffic Control v0.4.0 | Env: %s | Provider: %s | Broadcast: %.1fs | Camera: %.0fs | Gemini: %s | DB: %s",
+        "Starting WorldTraffic Control v0.4.0 | Env: %s | Aviation mode: %s | Provider: %s | Broadcast: %.1fs | Camera: %.0fs | Gemini: %s | DB: %s",
         settings.app_env,
-        settings.aircraft_provider,
+        settings.aviation_data_mode,
+        settings.aviation_provider,
         settings.broadcast_interval,
         settings.camera_fetch_interval,
         "enabled" if settings.gemini_api_key else "disabled",
@@ -133,10 +134,25 @@ async def readyz():
 
 @app.get("/api/status", tags=["health"], response_model=ServiceStatus)
 async def service_status():
+    provider_status = factory.last_provider_status
     return ServiceStatus(
         app_env=settings.app_env,
         aircraft_provider=factory.primary_type,
-        simulated_mode=factory.primary_type == "simulated",
+        aviation_data_mode=settings.aviation_data_mode,
+        aviation_provider=settings.aviation_provider,
+        aviation_provider_label=(
+            provider_status.provider_label
+            if provider_status
+            else settings.aviation_provider.replace("_", " ").title()
+        ),
+        aviation_active_source=factory.active_provider_key,
+        aviation_provider_healthy=(
+            provider_status.healthy if provider_status else settings.aviation_provider == "simulated"
+        ),
+        aviation_provider_degraded=provider_status.degraded if provider_status else False,
+        aviation_provider_message=provider_status.message if provider_status else None,
+        aviation_last_snapshot_at=provider_status.last_snapshot_at if provider_status else None,
+        simulated_mode=factory.active_provider_key == "simulated",
         opensky_configured=bool(
             settings.opensky_username and settings.opensky_password
         ),
