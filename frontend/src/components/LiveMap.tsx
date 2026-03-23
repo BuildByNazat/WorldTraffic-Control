@@ -294,7 +294,7 @@ function HighlightLayer({ location, variant, enabled }: HighlightLayerProps) {
     })
       .addTo(map)
       .bindPopup(
-        `<div class="aircraft-popup"><h3>${location.label}</h3><p style="font-size:0.75rem;color:#8b949e;margin-top:4px">${subtitle}</p></div>`
+        `<div class="aircraft-popup"><h3>${location.label}</h3><p class="map-popup__note">${subtitle}</p></div>`
       )
       .openPopup();
 

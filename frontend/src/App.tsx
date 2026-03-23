@@ -85,6 +85,10 @@ const App: React.FC = () => {
   const openIncidentsCount = incidentsState.incidents.filter(
     (incident) => incident.status !== "closed"
   ).length;
+  const mapSummaryLabel =
+    mode === "live"
+      ? `${aircraftCount.toLocaleString()} aircraft and ${openAlertsCount.toLocaleString()} open alerts in the active view`
+      : `${historyFeed.aircraftTotal.toLocaleString()} aircraft records and ${historyFeed.detectionsTotal.toLocaleString()} detections in review`;
 
   const linkedIncident = useMemo(() => {
     if (selectedEvent?.kind === "alert") {
@@ -342,6 +346,29 @@ const App: React.FC = () => {
 
           {workspaceOpen && (
             <div className="app-sidebar__content">
+              <div className="app-sidebar__panel-header">
+                <div className="app-sidebar__panel-copy">
+                  <span className="app-sidebar__panel-eyebrow">Workspace</span>
+                  <span className="app-sidebar__panel-title">
+                    {WORKSPACE_LABELS[workspaceSection]}
+                  </span>
+                  <span className="app-sidebar__panel-subtitle">
+                    {workspaceSection === "operations"
+                      ? "System status, layers, and live-readiness controls"
+                      : workspaceSection === "alerts"
+                        ? "Active alert review and operator triage"
+                        : "Promoted incidents and case follow-up"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="app-sidebar__collapse"
+                  onClick={() => setWorkspaceOpen(false)}
+                >
+                  Collapse
+                </button>
+              </div>
+
               {workspaceSection === "operations" && (
                 <div className="app-sidebar__stack">
                   <StatusPanel
@@ -389,8 +416,30 @@ const App: React.FC = () => {
                 {mode === "live" ? "Live tracking" : "Recorded review"}
               </span>
               <span className="app-map-toolbar__title">
-                The map stays primary while workspace panels open only when needed.
+                Unified map-first tracking where panels stay contextual and secondary.
               </span>
+            </div>
+            <div className="app-map-toolbar__metrics" aria-label="Tracking overview">
+              <div className="app-map-toolbar__metric">
+                <span className="app-map-toolbar__metric-value">
+                  {mode === "live"
+                    ? aircraftCount.toLocaleString()
+                    : historyFeed.aircraftTotal.toLocaleString()}
+                </span>
+                <span className="app-map-toolbar__metric-label">
+                  {mode === "live" ? "Tracked aircraft" : "Aircraft records"}
+                </span>
+              </div>
+              <div className="app-map-toolbar__metric">
+                <span className="app-map-toolbar__metric-value">
+                  {mode === "live"
+                    ? openAlertsCount.toLocaleString()
+                    : historyFeed.detectionsTotal.toLocaleString()}
+                </span>
+                <span className="app-map-toolbar__metric-label">
+                  {mode === "live" ? "Open alerts" : "Detections"}
+                </span>
+              </div>
             </div>
             <div className="app-map-toolbar__actions">
               {!workspaceOpen && (
@@ -415,6 +464,10 @@ const App: React.FC = () => {
           </div>
 
           <div className="app-map-stage">
+            <div className="app-map-stage__status">
+              <span className="app-map-stage__status-dot" aria-hidden="true" />
+              <span>{mapSummaryLabel}</span>
+            </div>
             <LiveMap
               data={data}
               alerts={alertsState.alerts}
