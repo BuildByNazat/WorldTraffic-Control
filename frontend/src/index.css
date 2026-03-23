@@ -110,11 +110,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .mode-toggle__dot--live::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--success)}
 
 /* ━━ Main area — full bleed map ━━ */
-.app-main{position:relative;flex:1;min-height:0;overflow:hidden}
+.app-main{position:relative;flex:1;min-height:0;overflow:hidden;isolation:isolate}
 
 /* ━━ Icon rail ━━ */
 .rail{
-  position:absolute;top:0;left:0;bottom:0;z-index:40;
+  position:absolute;top:0;left:0;bottom:0;z-index:600;
   width:var(--rail-w);
   display:flex;flex-direction:column;align-items:center;
   gap:2px;padding:10px 0;
@@ -145,7 +145,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 /* ━━ Drawer (left) ━━ */
 .drawer{
-  position:absolute;top:0;bottom:0;z-index:35;
+  position:absolute;top:0;bottom:0;z-index:500;
   left:var(--rail-w);
   width:var(--drawer-w);
   display:flex;flex-direction:column;
@@ -177,9 +177,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @keyframes drawer-right-in{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
 
 /* ━━ Map stage (full bleed) ━━ */
-.app-map-stage{position:absolute;inset:0;overflow:hidden;background:#06101c}
+.app-map-stage{position:absolute;inset:0;overflow:hidden;background:#06101c;z-index:0}
 .app-map-stage__status{
-  position:absolute;top:10px;left:calc(var(--rail-w) + 10px);z-index:30;
+  position:absolute;top:10px;left:calc(var(--rail-w) + 10px);z-index:550;
   display:inline-flex;align-items:center;gap:7px;
   max-width:min(440px,calc(100% - var(--rail-w) - 80px));
   padding:5px 12px;border-radius:999px;
@@ -195,7 +195,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .map-container{width:100%;height:100%;background:#06101c}
 .map-container--light{background:#dfe8f3}
 .leaflet-container{font-family:var(--font-sans);background:transparent}
-.leaflet-control-container .leaflet-top,.leaflet-control-container .leaflet-bottom{z-index:20}
+.leaflet-control-container .leaflet-top,.leaflet-control-container .leaflet-bottom{z-index:400}
 .leaflet-control-zoom{margin-top:10px!important;margin-left:calc(var(--rail-w) + 10px)!important;border:none!important;border-radius:8px!important;overflow:hidden!important;box-shadow:var(--shadow-md)!important}
 .leaflet-control-zoom a{
   width:30px!important;height:30px!important;line-height:28px!important;
@@ -394,7 +394,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 /* ━━ Event detail drawer ━━ */
 .event-detail{
-  position:absolute;right:14px;bottom:14px;z-index:50;
+  position:absolute;right:14px;bottom:14px;z-index:550;
   width:min(320px,calc(100% - var(--rail-w) - 28px));
   max-height:min(420px,calc(100% - 28px));
   border:1px solid var(--border);border-radius:14px;
