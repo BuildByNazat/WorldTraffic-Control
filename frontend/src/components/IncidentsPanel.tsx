@@ -30,9 +30,9 @@ const IncidentsPanel: React.FC<IncidentsPanelProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    setDraftNotes(
+    setDraftNotes((current) =>
       incidents.reduce<Record<string, string>>((acc, incident) => {
-        acc[incident.id] = incident.operator_notes ?? "";
+        acc[incident.id] = current[incident.id] ?? incident.operator_notes ?? "";
         return acc;
       }, {})
     );
@@ -105,7 +105,12 @@ const IncidentsPanel: React.FC<IncidentsPanelProps> = ({
           placeholder="Search title, category, camera"
           aria-label="Search incidents"
         />
-        <button type="button" className="panel-action" onClick={handleExport}>
+        <button
+          type="button"
+          className="panel-action"
+          onClick={handleExport}
+          disabled={filteredIncidents.length === 0}
+        >
           Export CSV
         </button>
       </div>

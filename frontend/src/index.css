@@ -2557,3 +2557,112 @@ body ::selection {
     width: min(100vw, 380px);
   }
 }
+
+/* QA stability overrides */
+.alerts-panel,
+.incidents-panel,
+.event-detail,
+.history-panel,
+.status-panel,
+.layer-controls,
+.alerts-list,
+.incidents-list,
+.event-detail__content,
+.history-panel__content,
+.history-list,
+.analytics-panel,
+.history-summary {
+  min-height: 0;
+}
+
+.panel-toolbar {
+  flex-shrink: 0;
+}
+
+.history-list--empty {
+  justify-content: space-between;
+}
+
+.history-empty,
+.history-error,
+.alerts-panel__state,
+.incidents-panel__state {
+  text-wrap: balance;
+}
+
+@media (max-width: 1280px) {
+  .event-detail {
+    width: 328px;
+  }
+}
+
+@media (max-width: 980px) {
+  .status-panel,
+  .alerts-panel,
+  .layer-controls,
+  .incidents-panel,
+  .event-detail {
+    width: min(calc(100vw - 32px), 304px);
+  }
+
+  .status-panel {
+    min-width: 0;
+  }
+
+  .alerts-panel {
+    top: 254px;
+    max-height: 250px;
+  }
+
+  .incidents-panel {
+    bottom: 214px;
+    max-height: 190px;
+  }
+
+  .event-detail {
+    width: min(calc(100vw - 32px), 320px);
+  }
+
+  .history-panel {
+    width: min(100vw, 372px);
+  }
+}
+
+@media (max-width: 820px) {
+  .app-header {
+    padding: 14px 16px;
+  }
+
+  .app-header::after {
+    inset: auto 16px 0;
+  }
+
+  .app-header__tagline {
+    white-space: normal;
+  }
+
+  .mode-toggle {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .mode-toggle__btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .status-panel,
+  .alerts-panel,
+  .layer-controls,
+  .incidents-panel {
+    width: min(calc(100vw - 32px), 288px);
+  }
+
+  .history-panel {
+    width: min(100vw, 352px);
+  }
+
+  .event-detail {
+    width: min(calc(100vw - 32px), 296px);
+  }
+}

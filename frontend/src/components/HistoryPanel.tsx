@@ -250,20 +250,34 @@ function DetectionsTab({
   if (error) return <div className="history-error">{error}</div>;
   if (detections.length === 0) {
     return (
-      <div className="history-empty">
-        {searchActive
-          ? "No loaded detections match the current search."
-          : hasActiveFilters
-          ? "No detections match the current filters."
-          : "No detections are available yet."}
-        <br />
-        <span className="history-empty__hint">
+      <div className="history-list history-list--empty">
+        <div className="history-empty">
           {searchActive
-            ? "Load more records or broaden the search terms."
+            ? "No loaded detections match the current search."
             : hasActiveFilters
-            ? "Try widening the time range or clearing a filter."
-            : "Detections appear when the camera analysis pipeline records a result."}
-        </span>
+            ? "No detections match the current filters."
+            : "No detections are available yet."}
+          <br />
+          <span className="history-empty__hint">
+            {searchActive
+              ? hasMore
+                ? "Load more records or broaden the search terms."
+                : "Try broadening the search terms."
+              : hasActiveFilters
+              ? "Try widening the time range or clearing a filter."
+              : "Detections appear when the camera analysis pipeline records a result."}
+          </span>
+        </div>
+        {hasMore && (
+          <LoadMoreFooter
+            visibleCount={detections.length}
+            loadedCount={loadedCount}
+            totalCount={totalCount}
+            searchActive={searchActive}
+            onLoadMore={onLoadMore}
+            loadingMore={loadingMore}
+          />
+        )}
       </div>
     );
   }
@@ -342,20 +356,34 @@ function AircraftTab({
   if (error) return <div className="history-error">{error}</div>;
   if (aircraft.length === 0) {
     return (
-      <div className="history-empty">
-        {searchActive
-          ? "No loaded aircraft records match the current search."
-          : hasActiveFilters
-          ? "No aircraft records match the current filters."
-          : "No aircraft observations are available yet."}
-        <br />
-        <span className="history-empty__hint">
+      <div className="history-list history-list--empty">
+        <div className="history-empty">
           {searchActive
-            ? "Load more records or broaden the search terms."
+            ? "No loaded aircraft records match the current search."
             : hasActiveFilters
-            ? "Try widening the time range or clearing a filter."
-            : "Aircraft observations appear when the live feed records a position."}
-        </span>
+            ? "No aircraft records match the current filters."
+            : "No aircraft observations are available yet."}
+          <br />
+          <span className="history-empty__hint">
+            {searchActive
+              ? hasMore
+                ? "Load more records or broaden the search terms."
+                : "Try broadening the search terms."
+              : hasActiveFilters
+              ? "Try widening the time range or clearing a filter."
+              : "Aircraft observations appear when the live feed records a position."}
+          </span>
+        </div>
+        {hasMore && (
+          <LoadMoreFooter
+            visibleCount={aircraft.length}
+            loadedCount={loadedCount}
+            totalCount={totalCount}
+            searchActive={searchActive}
+            onLoadMore={onLoadMore}
+            loadingMore={loadingMore}
+          />
+        )}
       </div>
     );
   }
@@ -517,8 +545,12 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
       return;
     }
 
+    if (selectedEvent?.kind !== "history" && !replay.isPlaying) {
+      return;
+    }
+
     onSelectEvent(replay.currentEvent.detail);
-  }, [onSelectEvent, replay.currentEvent]);
+  }, [onSelectEvent, replay.currentEvent, replay.isPlaying, selectedEvent]);
 
   function handleReplayListSelection(detail: SelectedHistoryDetail) {
     if (replay.currentEvent?.eventKey === detail.eventKey) {
@@ -648,6 +680,9 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
             type="button"
             className="panel-action"
             onClick={handleExportHistoryCsv}
+            disabled={
+              searchedDetections.length === 0 && searchedAircraft.length === 0
+            }
           >
             Export CSV
           </button>
@@ -655,6 +690,9 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
             type="button"
             className="panel-action"
             onClick={handleExportHistoryJson}
+            disabled={
+              searchedDetections.length === 0 && searchedAircraft.length === 0
+            }
           >
             Export JSON
           </button>

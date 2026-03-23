@@ -45,7 +45,7 @@ export function useReplay(events: ReplayEvent[]): ReplayState {
       if (previous && events.some((event) => event.eventKey === previous)) {
         return previous;
       }
-      return events[0].eventKey;
+      return null;
     });
   }, [events]);
 
@@ -91,8 +91,13 @@ export function useReplay(events: ReplayEvent[]): ReplayState {
 
   const togglePlayback = useCallback(() => {
     if (events.length === 0) return;
+    if (currentEventKey === null) {
+      setCurrentEventKey(events[0].eventKey);
+      setIsPlaying(true);
+      return;
+    }
     setIsPlaying((current) => !current);
-  }, [events.length]);
+  }, [currentEventKey, events]);
 
   const selectEvent = useCallback((eventKey: string) => {
     setIsPlaying(false);

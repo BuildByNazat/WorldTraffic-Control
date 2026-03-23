@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { AlertRecord, AlertsState } from "../hooks/useAlerts";
 import { downloadCsv } from "../utils/export";
 
@@ -51,6 +51,12 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
   const visibleAlerts =
     variant === "compact" ? filteredAlerts.slice(0, 4) : filteredAlerts;
 
+  useEffect(() => {
+    if (variant === "compact" && searchQuery) {
+      setSearchQuery("");
+    }
+  }, [searchQuery, variant]);
+
   function handleExport() {
     downloadCsv("worldtraffic-alerts.csv", filteredAlerts.map((alert) => ({
       id: alert.id,
@@ -101,7 +107,12 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({
             placeholder="Search title, category, camera"
             aria-label="Search alerts"
           />
-          <button type="button" className="panel-action" onClick={handleExport}>
+          <button
+            type="button"
+            className="panel-action"
+            onClick={handleExport}
+            disabled={filteredAlerts.length === 0}
+          >
             Export CSV
           </button>
         </div>

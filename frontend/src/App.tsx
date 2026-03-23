@@ -79,7 +79,10 @@ const App: React.FC = () => {
     const nextIncident = incidentsState.incidents.find(
       (incident) => incident.id === selectedEvent.id
     );
-    if (!nextIncident) return;
+    if (!nextIncident) {
+      clearSelection();
+      return;
+    }
     if (
       selectedEvent.timestamp === nextIncident.updated_at &&
       selectedEvent.status === nextIncident.status &&
@@ -89,6 +92,23 @@ const App: React.FC = () => {
     }
     selectIncident(nextIncident, false);
   }, [incidentsState.incidents, selectedEvent]);
+
+  useEffect(() => {
+    if (selectedEvent?.kind !== "alert") return;
+    const nextAlert = alertsState.alerts.find((alert) => alert.id === selectedEvent.id);
+    if (!nextAlert) {
+      clearSelection();
+      return;
+    }
+    if (
+      selectedEvent.timestamp === nextAlert.timestamp &&
+      selectedEvent.status === nextAlert.status &&
+      selectedEvent.severity === nextAlert.severity
+    ) {
+      return;
+    }
+    selectAlert(nextAlert, false);
+  }, [alertsState.alerts, selectedEvent]);
 
   function clearSelection() {
     setSelectedEvent(null);
@@ -106,9 +126,7 @@ const App: React.FC = () => {
 
   function handleModeChange(next: AppMode) {
     setMode(next);
-    if (next === "live") {
-      clearSelection();
-    }
+    clearSelection();
   }
 
   function handleSelectEvent(event: SelectedEventDetail | null) {

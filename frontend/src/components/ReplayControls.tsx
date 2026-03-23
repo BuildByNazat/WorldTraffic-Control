@@ -16,7 +16,7 @@ interface ReplayControlsProps {
 }
 
 function formatTimestamp(value: string | null): string {
-  if (!value) return "—";
+  if (!value) return "Awaiting selection";
   return new Date(value).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
@@ -55,7 +55,7 @@ const ReplayControls: React.FC<ReplayControlsProps> = ({
     <div className="history-replay" aria-label="Replay controls">
       <div className="history-replay__header">
         <span className="history-section-label">Replay</span>
-        <span className="history-replay__order">Oldest → newest</span>
+        <span className="history-replay__order">Oldest to newest</span>
       </div>
 
       <div className="history-replay__main">
@@ -79,7 +79,7 @@ const ReplayControls: React.FC<ReplayControlsProps> = ({
             type="button"
             className="history-replay__button"
             onClick={onNext}
-            disabled={currentIndex >= totalEvents - 1}
+            disabled={currentIndex >= totalEvents - 1 && currentIndex >= 0}
           >
             Next
           </button>
@@ -110,7 +110,9 @@ const ReplayControls: React.FC<ReplayControlsProps> = ({
 
       <div className="history-replay__meta">
         <span className="history-replay__position">
-          Event {currentIndex + 1} / {totalEvents}
+          {currentIndex >= 0
+            ? `Event ${currentIndex + 1} / ${totalEvents}`
+            : `${totalEvents} loaded`}
         </span>
         <span className="history-replay__timestamp">
           {formatTimestamp(currentEvent?.timestamp ?? null)}
@@ -118,9 +120,11 @@ const ReplayControls: React.FC<ReplayControlsProps> = ({
       </div>
 
       <div className="history-replay__event">
-        <span className="history-replay__event-type">{currentEvent?.typeLabel}</span>
+        <span className="history-replay__event-type">
+          {currentEvent?.typeLabel ?? "Timeline"}
+        </span>
         <span className="history-replay__event-label">
-          {currentEvent?.label ?? "No event selected"}
+          {currentEvent?.label ?? "Use the timeline or list to review an event"}
         </span>
       </div>
     </div>
