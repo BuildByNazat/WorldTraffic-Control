@@ -1,8 +1,8 @@
 /**
- * App - root product shell.
+ * App — map-first product shell.
  *
- * The map remains the primary experience while workspace panels move into a
- * collapsible left rail and an optional right-side review panel.
+ * Full-bleed map with a slim icon rail on the left edge.
+ * Panels open as slide-out drawers overlaying the map.
  */
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -30,7 +30,22 @@ import type {
   SelectedIncidentDetail,
 } from "./types/selectedEvent";
 
-type WorkspaceSection = "operations" | "alerts" | "incidents";
+/* ── Rail panel identifiers (left-side operational tools only) ── */
+type RailPanel = "operations" | "alerts" | "incidents" | "layers";
+
+const PANEL_LABELS: Record<RailPanel, string> = {
+  operations: "Operations",
+  alerts: "Alerts",
+  incidents: "Incidents",
+  layers: "Layers",
+};
+
+const RAIL_ICONS: Record<RailPanel, string> = {
+  operations: "⚙",
+  alerts: "🔔",
+  incidents: "📋",
+  layers: "◈",
+};
 
 function isSameSelection(
   current: SelectedEventDetail | null,
@@ -43,18 +58,6 @@ function isSameSelection(
   return current.id === next.id;
 }
 
-const WORKSPACE_LABELS: Record<WorkspaceSection, string> = {
-  operations: "Operations",
-  alerts: "Alerts",
-  incidents: "Incidents",
-};
-
-const WORKSPACE_SHORT_LABELS: Record<WorkspaceSection, string> = {
-  operations: "Ops",
-  alerts: "Alt",
-  incidents: "Inc",
-};
-
 const App: React.FC = () => {
   const { data, status, lastUpdate } = useLiveFeed();
   const { theme, toggleTheme } = useTheme();
@@ -63,9 +66,7 @@ const App: React.FC = () => {
     null
   );
   const [highlight, setHighlight] = useState<HighlightLocation | null>(null);
-  const [workspaceSection, setWorkspaceSection] =
-    useState<WorkspaceSection>("operations");
-  const [workspaceOpen, setWorkspaceOpen] = useState(true);
+  const [activeDrawer, setActiveDrawer] = useState<RailPanel | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const historyFilters = useFilteredHistory();
@@ -85,10 +86,11 @@ const App: React.FC = () => {
   const openIncidentsCount = incidentsState.incidents.filter(
     (incident) => incident.status !== "closed"
   ).length;
+
   const mapSummaryLabel =
     mode === "live"
-      ? `${aircraftCount.toLocaleString()} aircraft and ${openAlertsCount.toLocaleString()} open alerts in the active view`
-      : `${historyFeed.aircraftTotal.toLocaleString()} aircraft records and ${historyFeed.detectionsTotal.toLocaleString()} detections in review`;
+      ? `${aircraftCount.toLocaleString()} aircraft · ${openAlertsCount.toLocaleString()} alerts`
+      : `${historyFeed.aircraftTotal.toLocaleString()} records · ${historyFeed.detectionsTotal.toLocaleString()} detections`;
 
   const linkedIncident = useMemo(() => {
     if (selectedEvent?.kind === "alert") {
@@ -103,14 +105,17 @@ const App: React.FC = () => {
     return null;
   }, [incidentsState, selectedEvent]);
 
+  /* History drawer is mode-driven: opens when entering history mode */
   useEffect(() => {
     if (mode === "history") {
       setHistoryOpen(true);
+      setActiveDrawer(null); // close any left drawer
     } else {
       setHistoryOpen(false);
     }
   }, [mode]);
 
+  /* Keep incident selection in sync */
   useEffect(() => {
     if (selectedEvent?.kind !== "incident") return;
     const nextIncident = incidentsState.incidents.find(
@@ -130,6 +135,7 @@ const App: React.FC = () => {
     selectIncident(nextIncident, false);
   }, [incidentsState.incidents, selectedEvent]);
 
+  /* Keep alert selection in sync */
   useEffect(() => {
     if (selectedEvent?.kind !== "alert") return;
     const nextAlert = alertsState.alerts.find((alert) => alert.id === selectedEvent.id);
@@ -171,8 +177,15 @@ const App: React.FC = () => {
       clearSelection();
       return;
     }
-
     applySelection(event);
+  }
+
+  function toggleDrawer(panel: RailPanel) {
+    setActiveDrawer((current) => {
+      if (current === panel) return null; // close if already open
+      setHistoryOpen(false); // close history when opening a left drawer
+      return panel;
+    });
   }
 
   function selectAlert(alert: AlertRecord, allowToggle = true) {
@@ -196,8 +209,8 @@ const App: React.FC = () => {
       return;
     }
 
-    setWorkspaceSection("alerts");
-    setWorkspaceOpen(true);
+    setActiveDrawer("alerts");
+    setHistoryOpen(false);
     applySelection(detail);
   }
 
@@ -224,8 +237,8 @@ const App: React.FC = () => {
       return;
     }
 
-    setWorkspaceSection("incidents");
-    setWorkspaceOpen(true);
+    setActiveDrawer("incidents");
+    setHistoryOpen(false);
     applySelection(detail);
   }
 
@@ -240,8 +253,13 @@ const App: React.FC = () => {
     }
   }
 
+  /* Drawer visibility */
+  const isLeftDrawer = activeDrawer !== null;
+  const isRightDrawer = historyOpen;
+
   return (
     <div className="app-shell">
+      {/* ── Header ── */}
       <header className="app-header">
         <div className="app-header__brand">
           <span className="logo" aria-hidden="true">
@@ -249,9 +267,6 @@ const App: React.FC = () => {
           </span>
           <div className="app-header__titles">
             <h1>WorldTraffic Control</h1>
-            <span className="app-header__tagline">
-              Unified map-based tracking where live position data is available
-            </span>
           </div>
         </div>
 
@@ -261,122 +276,104 @@ const App: React.FC = () => {
           <button
             type="button"
             className="app-header__button"
-            onClick={() => setWorkspaceOpen((current) => !current)}
-          >
-            {workspaceOpen ? "Hide workspace" : "Show workspace"}
-          </button>
-
-          {mode === "history" && (
-            <button
-              type="button"
-              className="app-header__button"
-              onClick={() => setHistoryOpen((current) => !current)}
-            >
-              {historyOpen ? "Hide review" : "Show review"}
-            </button>
-          )}
-
-          <button
-            type="button"
-            className="app-header__button app-header__button--theme"
             onClick={toggleTheme}
             aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
           >
-            {theme === "dark" ? "Light theme" : "Dark theme"}
+            {theme === "dark" ? "☀" : "☾"}
           </button>
-
-
-
           <ModeToggle mode={mode} onModeChange={handleModeChange} />
         </div>
       </header>
 
-      <main className={`app-layout app-layout--${mode}`}>
-        <aside
-          className={`app-sidebar${workspaceOpen ? "" : " app-sidebar--collapsed"}`}
-          aria-label="Workspace panel"
-        >
-          <div className="app-sidebar__nav">
-            {(["operations", "alerts", "incidents"] as WorkspaceSection[]).map(
-              (section) => (
-                <button
-                  key={section}
-                  type="button"
-                  className={`app-sidebar__tab${
-                    workspaceSection === section ? " app-sidebar__tab--active" : ""
-                  }`}
-                  onClick={() => {
-                    setWorkspaceSection(section);
-                    setWorkspaceOpen(true);
-                  }}
-                  title={WORKSPACE_LABELS[section]}
-                >
-                  <span className="app-sidebar__tab-short">
-                    {WORKSPACE_SHORT_LABELS[section]}
-                  </span>
-                  {workspaceOpen && (
-                    <>
-                      <span className="app-sidebar__tab-label">
-                        {WORKSPACE_LABELS[section]}
-                      </span>
-                      {section === "alerts" && openAlertsCount > 0 && (
-                        <span className="app-sidebar__tab-count">{openAlertsCount}</span>
-                      )}
-                      {section === "incidents" && openIncidentsCount > 0 && (
-                        <span className="app-sidebar__tab-count">
-                          {openIncidentsCount}
-                        </span>
-                      )}
-                    </>
-                  )}
-                </button>
-              )
-            )}
-          </div>
+      {/* ── Main: full-bleed map + overlays ── */}
+      <main className="app-main">
+        {/* Map fills entire area */}
+        <div className="app-map-stage">
+          <LiveMap
+            data={data}
+            alerts={alertsState.alerts}
+            layerState={mapLayers.layers}
+            theme={theme}
+            highlightLocation={highlight}
+            highlightVariant={
+              selectedEvent?.kind === "history"
+                ? "replay"
+                : selectedEvent?.kind === "alert" ||
+                    selectedEvent?.kind === "incident"
+                  ? "selected"
+                  : null
+            }
+            selectedAlertId={selectedEvent?.kind === "alert" ? selectedEvent.id : null}
+            onSelectAlert={selectAlert}
+          />
+        </div>
 
-          {workspaceOpen && (
-            <div className="app-sidebar__content">
-              <div className="app-sidebar__panel-header">
-                <span className="app-sidebar__panel-title">
-                  {WORKSPACE_LABELS[workspaceSection]}
-                </span>
-                <button
-                  type="button"
-                  className="app-sidebar__collapse"
-                  onClick={() => setWorkspaceOpen(false)}
-                >
-                  Collapse
-                </button>
-              </div>
+        {/* Status pill */}
+        <div className="app-map-stage__status">
+          <span className="app-map-stage__status-dot" aria-hidden="true" />
+          <span>{mapSummaryLabel}</span>
+        </div>
 
-              {workspaceSection === "operations" && (
-                <div className="app-sidebar__stack">
-                  <StatusPanel
-                    status={status}
-                    aircraftCount={aircraftCount}
-                    detectionCount={detectionCount}
-                    lastUpdate={lastUpdate}
-                    serviceStatus={serviceStatusState.status}
-                    serviceStatusLoading={serviceStatusState.loading}
-                    serviceStatusError={serviceStatusState.error}
-                  />
-                  <LayerControls
-                    layers={mapLayers.layers}
-                    onToggleLayer={mapLayers.toggleLayer}
-                  />
-                </div>
+        {/* ── Icon rail ── */}
+        <nav className="rail" aria-label="Tools">
+          {(["operations", "alerts", "incidents", "layers"] as RailPanel[]).map(
+            (panel) => (
+              <button
+                key={panel}
+                type="button"
+                className={`rail__btn${activeDrawer === panel ? " rail__btn--active" : ""}`}
+                onClick={() => toggleDrawer(panel)}
+                title={PANEL_LABELS[panel]}
+                aria-label={PANEL_LABELS[panel]}
+              >
+                {RAIL_ICONS[panel]}
+                {panel === "alerts" && openAlertsCount > 0 && (
+                  <span className="rail__btn-badge">{openAlertsCount}</span>
+                )}
+                {panel === "incidents" && openIncidentsCount > 0 && (
+                  <span className="rail__btn-badge">{openIncidentsCount}</span>
+                )}
+              </button>
+            )
+          )}
+        </nav>
+
+        {/* ── Left drawer (operations / alerts / incidents / layers) ── */}
+        {isLeftDrawer && (
+          <aside className="drawer" aria-label={PANEL_LABELS[activeDrawer!]}>
+            <div className="drawer__header">
+              <span className="drawer__title">{PANEL_LABELS[activeDrawer!]}</span>
+              <button
+                type="button"
+                className="drawer__close"
+                onClick={() => setActiveDrawer(null)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className={`drawer__body${activeDrawer === "operations" || activeDrawer === "layers" ? " drawer__body--padded" : ""}`}>
+              {activeDrawer === "operations" && (
+                <StatusPanel
+                  status={status}
+                  aircraftCount={aircraftCount}
+                  detectionCount={detectionCount}
+                  lastUpdate={lastUpdate}
+                  serviceStatus={serviceStatusState.status}
+                  serviceStatusLoading={serviceStatusState.loading}
+                  serviceStatusError={serviceStatusState.error}
+                />
               )}
-
-              {workspaceSection === "alerts" && (
+              {activeDrawer === "alerts" && (
                 <AlertsPanel
                   alertsState={alertsState}
                   onSelectAlert={selectAlert}
                   variant="full"
-                  selectedAlertId={selectedEvent?.kind === "alert" ? selectedEvent.id : null}
+                  selectedAlertId={
+                    selectedEvent?.kind === "alert" ? selectedEvent.id : null
+                  }
                 />
               )}
-
-              {workspaceSection === "incidents" && (
+              {activeDrawer === "incidents" && (
                 <IncidentsPanel
                   incidentsState={incidentsState}
                   selectedIncidentId={
@@ -385,82 +382,54 @@ const App: React.FC = () => {
                   onSelectIncident={selectIncident}
                 />
               )}
-            </div>
-          )}
-        </aside>
-
-        <section className="app-map-shell">
-          <div className="app-map-stage">
-            <div className="app-map-stage__status">
-              <span className="app-map-stage__status-dot" aria-hidden="true" />
-              <span>{mapSummaryLabel}</span>
-              {(!workspaceOpen || (mode === "history" && !historyOpen)) && (
-                <span className="app-map-stage__actions">
-                  {!workspaceOpen && (
-                    <button
-                      type="button"
-                      className="app-header__button"
-                      onClick={() => setWorkspaceOpen(true)}
-                    >
-                      Workspace
-                    </button>
-                  )}
-                  {mode === "history" && !historyOpen && (
-                    <button
-                      type="button"
-                      className="app-header__button"
-                      onClick={() => setHistoryOpen(true)}
-                    >
-                      Review
-                    </button>
-                  )}
-                </span>
+              {activeDrawer === "layers" && (
+                <LayerControls
+                  layers={mapLayers.layers}
+                  onToggleLayer={mapLayers.toggleLayer}
+                />
               )}
             </div>
-            <LiveMap
-              data={data}
-              alerts={alertsState.alerts}
-              layerState={mapLayers.layers}
-              theme={theme}
-              highlightLocation={highlight}
-              highlightVariant={
-                selectedEvent?.kind === "history"
-                  ? "replay"
-                  : selectedEvent?.kind === "alert" ||
-                      selectedEvent?.kind === "incident"
-                    ? "selected"
-                    : null
-              }
-              selectedAlertId={selectedEvent?.kind === "alert" ? selectedEvent.id : null}
-              onSelectAlert={selectAlert}
-            />
-
-            <EventDetailDrawer
-              selectedEvent={selectedEvent}
-              onClose={clearSelection}
-              linkedIncident={linkedIncident}
-              onCreateIncidentFromAlert={() => {
-                void handleCreateIncidentFromSelectedAlert();
-              }}
-              onOpenLinkedIncident={() => {
-                if (linkedIncident) {
-                  selectIncident(linkedIncident, false);
-                }
-              }}
-            />
-          </div>
-        </section>
-
-        {mode === "history" && historyOpen && (
-          <section className="app-history-shell">
-            <HistoryPanel
-              feed={historyFeed}
-              filters={historyFilters}
-              onSelectEvent={handleSelectEvent}
-              selectedEvent={selectedEvent}
-            />
-          </section>
+          </aside>
         )}
+
+        {/* ── Right drawer (history) ── */}
+        {isRightDrawer && (
+          <aside className="drawer drawer--right" aria-label="History & Review">
+            <div className="drawer__header">
+              <span className="drawer__title">History &amp; Review</span>
+              <button
+                type="button"
+                className="drawer__close"
+                onClick={() => setHistoryOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="drawer__body">
+              <HistoryPanel
+                feed={historyFeed}
+                filters={historyFilters}
+                onSelectEvent={handleSelectEvent}
+                selectedEvent={selectedEvent}
+              />
+            </div>
+          </aside>
+        )}
+
+        {/* ── Event detail ── */}
+        <EventDetailDrawer
+          selectedEvent={selectedEvent}
+          onClose={clearSelection}
+          linkedIncident={linkedIncident}
+          onCreateIncidentFromAlert={() => {
+            void handleCreateIncidentFromSelectedAlert();
+          }}
+          onOpenLinkedIncident={() => {
+            if (linkedIncident) {
+              selectIncident(linkedIncident, false);
+            }
+          }}
+        />
       </main>
     </div>
   );
