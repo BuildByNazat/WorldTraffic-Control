@@ -170,8 +170,8 @@ const App: React.FC = () => {
 
   function handleModeChange(next: AppMode) {
     if (next === mode && next === "history") {
-      // Re-clicking Review while already in history mode: reopen the drawer
-      setHistoryOpen(true);
+      // Re-clicking Review while already in history mode: toggle the drawer
+      setHistoryOpen((prev) => !prev);
       return;
     }
     setMode(next);
@@ -431,6 +431,18 @@ const App: React.FC = () => {
               />
             </div>
           </aside>
+        )}
+
+        {/* Edge handle — shows when in history mode but drawer is hidden */}
+        {mode === "history" && !historyOpen && (
+          <button
+            type="button"
+            className="drawer-edge-handle"
+            onClick={() => setHistoryOpen(true)}
+            aria-label="Show review"
+          >
+            ◂
+          </button>
         )}
 
         {/* ── Event detail ── */}
