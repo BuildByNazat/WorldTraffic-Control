@@ -49,6 +49,9 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    broadcast_task: asyncio.Task | None = None
+    camera_task: asyncio.Task | None = None
+
     logger.info(
         "Starting WorldTraffic Control v0.4.0 | Provider: %s | Broadcast: %.1fs | Camera: %.0fs | Gemini: %s | DB: %s",
         settings.aircraft_provider,
@@ -57,22 +60,39 @@ async def lifespan(app: FastAPI):
         "enabled" if settings.gemini_api_key else "disabled",
         settings.db_path,
     )
+    logger.info("Configured CORS origins: %s", ", ".join(settings.cors_origins))
 
-    await init_db()
+    try:
+        await init_db()
 
-    broadcast_task = asyncio.create_task(broadcast_loop(), name="broadcast_loop")
-    camera_task = asyncio.create_task(camera_fetch_loop(), name="camera_fetch_loop")
-    logger.info("All background tasks launched.")
+        broadcast_task = asyncio.create_task(broadcast_loop(), name="broadcast_loop")
+        camera_task = asyncio.create_task(camera_fetch_loop(), name="camera_fetch_loop")
+        logger.info("All background tasks launched.")
 
-    yield
+        yield
+    except Exception:
+        logger.exception("Application startup/runtime failure.")
+        raise
+    finally:
+        logger.info("Shutting down...")
 
-    logger.info("Shutting down...")
-    broadcast_task.cancel()
-    camera_task.cancel()
-    await asyncio.gather(broadcast_task, camera_task, return_exceptions=True)
-    await factory.close()
-    await close_db()
-    logger.info("WorldTraffic Control shutdown complete.")
+        tasks = [task for task in (broadcast_task, camera_task) if task is not None]
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+        try:
+            await factory.close()
+        except Exception:
+            logger.exception("Failed to close provider resources cleanly.")
+
+        try:
+            await close_db()
+        except Exception:
+            logger.exception("Failed to close database resources cleanly.")
+
+        logger.info("WorldTraffic Control shutdown complete.")
 
 
 app = FastAPI(
@@ -84,11 +104,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-    ],
+    allow_origins=list(settings.cors_origins),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

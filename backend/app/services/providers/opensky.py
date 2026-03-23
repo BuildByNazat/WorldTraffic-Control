@@ -79,9 +79,9 @@ class OpenSkyProvider(BaseAircraftProvider):
 
             return AircraftFeatureCollection(features=features)
 
-        except Exception as exc:
-            logger.error("Failed to fetch data from OpenSky: %s", exc)
-            raise exc
+        except Exception:
+            logger.exception("Failed to fetch data from OpenSky.")
+            raise
 
     async def close(self):
         """Clean up the httpx client."""

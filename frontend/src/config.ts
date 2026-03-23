@@ -1,15 +1,24 @@
 /**
- * config.ts — Frontend configuration constants.
+ * Frontend runtime configuration.
  *
- * Single source of truth for API/WS URLs and reconnect policy.
- * Override via .env.local using the VITE_* prefix.
+ * Defaults are same-origin so production deployments behind a reverse proxy do
+ * not need hardcoded localhost URLs. Local development works through the Vite
+ * dev-server proxy defined in vite.config.ts.
  */
 
+function stripTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, "");
+}
+
+const explicitApiBase = import.meta.env.VITE_API_URL?.trim();
+const explicitWsUrl = import.meta.env.VITE_WS_URL?.trim();
+const browserWsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+
+export const API_BASE: string = explicitApiBase
+  ? stripTrailingSlash(explicitApiBase)
+  : "";
+
 export const WS_URL: string =
-  import.meta.env.VITE_WS_URL ?? "ws://localhost:8000/ws/live";
+  explicitWsUrl || `${browserWsProtocol}://${window.location.host}/ws/live`;
 
-export const API_BASE: string =
-  import.meta.env.VITE_API_URL ?? "http://localhost:8000";
-
-/** Milliseconds to wait before attempting a WebSocket reconnect. */
 export const WS_RECONNECT_DELAY_MS = 3_000;
