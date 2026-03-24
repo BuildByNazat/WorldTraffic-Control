@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProviderFactory:
-    """Manage the active aviation provider and a safe simulated fallback path."""
+    """Manage the active aviation provider and a safe internal fallback path."""
 
     def __init__(self) -> None:
         self._primary_type = settings.aviation_provider
@@ -69,8 +69,8 @@ class ProviderFactory:
         """
         Return a normalized aviation snapshot from the configured provider path.
 
-        If the configured provider fails, the app falls back to the simulated
-        provider for continuity while preserving degraded status metadata.
+        If the configured provider fails, the app falls back to the internal
+        safety provider for continuity while preserving degraded status metadata.
         """
         provider = self._providers[self._primary_type]
 
@@ -93,7 +93,7 @@ class ProviderFactory:
                 last_snapshot_at=exc.status.last_snapshot_at,
             )
             logger.warning(
-                "Primary aviation provider failed; falling back to simulated data. Reason: %s",
+                "Primary aviation provider failed; falling back to internal backup data. Reason: %s",
                 exc.status.message,
             )
         except Exception as exc:

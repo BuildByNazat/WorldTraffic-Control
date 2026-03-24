@@ -401,7 +401,7 @@ function AircraftTab({
                 : "Try broadening the search terms."
               : hasActiveFilters
                 ? "Try widening the time range or clearing a filter."
-                : "Aircraft observations appear as the live feed records positions, including simulated demo traffic by default."}
+                : "Aircraft observations appear as the live feed records positions from the active aviation provider, with fallback only when upstream data is unavailable."}
           </span>
         </div>
         {hasMore && (

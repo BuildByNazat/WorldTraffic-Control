@@ -165,9 +165,9 @@ Configured in `frontend/.env.local`.
 
 If `VITE_API_URL` and `VITE_WS_URL` are unset, the frontend defaults to same-origin `/api` and `/ws/live`, which is the preferred production deployment model behind a reverse proxy.
 
-## Docker demo
+## Docker evaluation
 
-For a containerized demo with the same-origin production-style frontend:
+For a containerized evaluation stack with the same-origin production-style frontend:
 
 ```powershell
 docker compose up --build
@@ -180,7 +180,7 @@ Notes:
 - the frontend container serves the built app with nginx
 - `/api/*` and `/ws/*` are proxied to the backend container
 - SQLite data is persisted in the named Docker volume `worldtraffic_data`
-- the default Docker path is also demo-friendly and works without Gemini or OpenSky credentials
+- the default Docker path is evaluation-ready and works with anonymous OpenSky access if credentials are not set yet
 - the backend is intentionally kept internal to the compose network; public access flows through the frontend reverse proxy
 
 To stop the stack:
@@ -270,7 +270,7 @@ This pass improves runtime safety and deployability, but a real commercial launc
 - a stronger database than SQLite if you move beyond a single-instance deployment
 - secrets management outside checked-in env files
 
-## Recommended demo flow
+## Recommended review flow
 
 1. Open Live mode and show the dashboard shell, map layers, and alert visibility.
 2. Click a live alert or marker to show the detail drawer and map highlighting.
