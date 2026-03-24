@@ -67,7 +67,7 @@ export function useAircraftSearch(query: string, enabled = true) {
         setError(
           nextError instanceof Error
             ? nextError.message
-            : "Unable to search aircraft right now."
+            : "Unable to search aircraft right now. Provider data may be delayed or temporarily unavailable."
         );
       } finally {
         setLoading(false);

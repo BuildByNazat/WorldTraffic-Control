@@ -141,6 +141,11 @@ def _serialize_aircraft_alert_rule(
 ) -> AircraftAlertRuleRecord:
     current_visible = current_flight is not None
     distance_nm: Optional[float] = None
+    stale_note = (
+        " The current provider track is stale, so status may lag behind live movement."
+        if current_visible and getattr(current_flight, "stale", False)
+        else ""
+    )
 
     if not row.enabled:
         status = "disabled"
@@ -148,21 +153,24 @@ def _serialize_aircraft_alert_rule(
     elif row.alert_type == "visible":
         status = "triggered" if current_visible else "waiting"
         message = (
-            "Aircraft is currently visible in the active provider snapshot."
+            "Aircraft is currently visible in the live provider snapshot."
             if current_visible
-            else "Waiting for the aircraft to appear in the active provider snapshot."
+            else "Waiting for the aircraft to appear in the live provider snapshot."
         )
     elif row.alert_type == "not_visible":
         status = "triggered" if not current_visible else "waiting"
         message = (
-            "Aircraft is not currently visible in the active provider snapshot."
+            "Aircraft is not currently visible in the live provider snapshot."
             if not current_visible
-            else "Aircraft is still visible in the active provider snapshot."
+            else "Aircraft is still visible in the live provider snapshot."
         )
     else:
         if not current_visible:
             status = "unavailable"
             message = "Movement alert is unavailable because the aircraft is not currently visible."
+        elif getattr(current_flight, "stale", False):
+            status = "unavailable"
+            message = "Movement alert is temporarily unavailable because the current provider track is stale."
         elif row.baseline_latitude is None or row.baseline_longitude is None:
             status = "unavailable"
             message = "Movement alert needs a saved position baseline from the watchlist entry."
@@ -180,6 +188,9 @@ def _serialize_aircraft_alert_rule(
                 if distance_nm >= threshold
                 else f"Waiting for {threshold:.0f} NM of movement from the saved position ({distance_nm:.1f} NM so far)."
             )
+
+    if stale_note and row.alert_type != "movement":
+        message = f"{message}{stale_note}"
 
     return AircraftAlertRuleRecord(
         id=row.id,

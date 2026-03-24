@@ -288,6 +288,18 @@ const App: React.FC = () => {
   }, [aircraftAlertsState.error]);
 
   useEffect(() => {
+    if (!watchlistFeedback) return;
+    const timer = window.setTimeout(() => setWatchlistFeedback(null), 4500);
+    return () => window.clearTimeout(timer);
+  }, [watchlistFeedback]);
+
+  useEffect(() => {
+    if (!aircraftAlertsFeedback) return;
+    const timer = window.setTimeout(() => setAircraftAlertsFeedback(null), 4500);
+    return () => window.clearTimeout(timer);
+  }, [aircraftAlertsFeedback]);
+
+  useEffect(() => {
     if (selectedEvent?.kind !== "incident") return;
     const nextIncident = incidentsState.incidents.find(
       (incident) => incident.id === selectedEvent.id
@@ -604,8 +616,12 @@ const App: React.FC = () => {
                     <button
                       type="button"
                       className="account-menu__action"
-                      onClick={() => {
-                        void authState.signOut();
+                      onClick={async () => {
+                        await authState.signOut();
+                        setAuthEmail("");
+                        setAuthPassword("");
+                        setWatchlistFeedback(null);
+                        setAircraftAlertsFeedback(null);
                         setAccountOpen(false);
                       }}
                       disabled={authState.submitting}
@@ -621,7 +637,10 @@ const App: React.FC = () => {
                         className={`account-menu__tab${
                           authMode === "signin" ? " account-menu__tab--active" : ""
                         }`}
-                        onClick={() => setAuthMode("signin")}
+                        onClick={() => {
+                          authState.clearError();
+                          setAuthMode("signin");
+                        }}
                       >
                         Sign in
                       </button>
@@ -630,7 +649,10 @@ const App: React.FC = () => {
                         className={`account-menu__tab${
                           authMode === "signup" ? " account-menu__tab--active" : ""
                         }`}
-                        onClick={() => setAuthMode("signup")}
+                        onClick={() => {
+                          authState.clearError();
+                          setAuthMode("signup");
+                        }}
                       >
                         Sign up
                       </button>
