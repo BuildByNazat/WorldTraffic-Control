@@ -31,6 +31,20 @@ export interface SelectedHistoryDetail extends SelectedEventBase {
   replayTotal?: number | null;
 }
 
+export interface SelectedAircraftDetail extends SelectedEventBase {
+  kind: "aircraft";
+  callsign?: string | null;
+  flightIdentifier?: string | null;
+  altitude?: number | null;
+  speed?: number | null;
+  heading?: number | null;
+  providerName?: string | null;
+  routeOrigin?: string | null;
+  routeDestination?: string | null;
+  freshnessSeconds?: number | null;
+  stale?: boolean;
+}
+
 export interface SelectedIncidentDetail extends SelectedEventBase {
   kind: "incident";
   sourceAlertId: string;
@@ -42,5 +56,6 @@ export interface SelectedIncidentDetail extends SelectedEventBase {
 
 export type SelectedEventDetail =
   | SelectedAlertDetail
+  | SelectedAircraftDetail
   | SelectedHistoryDetail
   | SelectedIncidentDetail;

@@ -10,6 +10,7 @@ import "leaflet/dist/leaflet.css";
 import {
   type CombinedFeatureCollection,
   type AnyFeature,
+  type AircraftFeature,
   isAircraftFeature,
 } from "../hooks/useLiveFeed";
 import type { AlertRecord } from "../hooks/useAlerts";
@@ -83,15 +84,21 @@ function createAlertIcon(
 function buildAircraftPopup(feature: AnyFeature): string {
   if (!isAircraftFeature(feature)) return "";
   const properties = feature.properties;
+  const observed = properties.observed_at
+    ? new Date(properties.observed_at).toLocaleTimeString()
+    : "Provider timestamp unavailable";
   return `
     <div class="aircraft-popup">
-      <h3>${properties.callsign}</h3>
+      <h3>${properties.callsign ?? properties.flight_identifier ?? properties.id}</h3>
       <table>
         <tr><td>ID</td><td>${properties.id}</td></tr>
+        <tr><td>Identifier</td><td>${properties.flight_identifier ?? properties.callsign ?? "-"}</td></tr>
         <tr><td>Altitude</td><td>${properties.altitude.toLocaleString()} ft</td></tr>
         <tr><td>Heading</td><td>${properties.heading} deg</td></tr>
         <tr><td>Speed</td><td>${properties.speed} kt</td></tr>
-        <tr><td>Source</td><td>${properties.source}</td></tr>
+        <tr><td>Observed</td><td>${observed}</td></tr>
+        <tr><td>Provider</td><td>${properties.provider_name ?? properties.source}</td></tr>
+        <tr><td>Route</td><td>${properties.route_origin ?? "Unavailable"} - ${properties.route_destination ?? "Unavailable"}</td></tr>
       </table>
     </div>
   `;
@@ -135,9 +142,16 @@ function buildAlertPopup(alert: AlertRecord): string {
 interface LiveMarkersLayerProps {
   data: CombinedFeatureCollection | null;
   layers: MapLayerState;
+  selectedAircraftId: string | null;
+  onSelectAircraft: (feature: AircraftFeature) => void;
 }
 
-function LiveMarkersLayer({ data, layers }: LiveMarkersLayerProps) {
+function LiveMarkersLayer({
+  data,
+  layers,
+  selectedAircraftId,
+  onSelectAircraft,
+}: LiveMarkersLayerProps) {
   const map = useMap();
   const markerMap = useRef<Map<string, L.Marker>>(new Map());
 
@@ -177,12 +191,19 @@ function LiveMarkersLayer({ data, layers }: LiveMarkersLayerProps) {
         existing.setLatLng([lat, lon]);
         existing.setIcon(icon);
         existing.setPopupContent(popup);
+        if (isAircraftFeature(feature)) {
+          existing.setZIndexOffset(feature.properties.id === selectedAircraftId ? 1000 : 0);
+        }
       } else {
         const marker = L.marker([lat, lon], { icon }).addTo(map).bindPopup(popup);
+        if (isAircraftFeature(feature)) {
+          marker.setZIndexOffset(feature.properties.id === selectedAircraftId ? 1000 : 0);
+          marker.on("click", () => onSelectAircraft(feature));
+        }
         markerMap.current.set(markerId, marker);
       }
     });
-  }, [data, layers.showAircraft, layers.showDetections, map]);
+  }, [data, layers.showAircraft, layers.showDetections, map, onSelectAircraft, selectedAircraftId]);
 
   useEffect(() => {
     return () => {
@@ -326,7 +347,9 @@ export interface LiveMapProps {
   highlightLocation?: HighlightLocation | null;
   highlightVariant?: HighlightVariant;
   selectedAlertId?: string | null;
+  selectedAircraftId?: string | null;
   onSelectAlert: (alert: AlertRecord) => void;
+  onSelectAircraft: (feature: AircraftFeature) => void;
 }
 
 const LiveMap: React.FC<LiveMapProps> = ({
@@ -337,7 +360,9 @@ const LiveMap: React.FC<LiveMapProps> = ({
   highlightLocation,
   highlightVariant = null,
   selectedAlertId = null,
+  selectedAircraftId = null,
   onSelectAlert,
+  onSelectAircraft,
 }) => {
   const highlightEnabled =
     highlightVariant === "replay"
@@ -363,7 +388,12 @@ const LiveMap: React.FC<LiveMapProps> = ({
             : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         }
       />
-      <LiveMarkersLayer data={data} layers={layerState} />
+      <LiveMarkersLayer
+        data={data}
+        layers={layerState}
+        selectedAircraftId={selectedAircraftId}
+        onSelectAircraft={onSelectAircraft}
+      />
       <AlertMarkersLayer
         alerts={alerts}
         layers={layerState}

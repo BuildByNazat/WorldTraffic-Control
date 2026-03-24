@@ -35,6 +35,7 @@ class ProviderFactory:
             ),
         }
         self._last_provider_status: AviationProviderStatus | None = None
+        self._last_snapshot: AviationSnapshot | None = None
         self._active_provider_key = self._primary_type
 
         logger.info(
@@ -59,6 +60,11 @@ class ProviderFactory:
         """Latest provider health/status record from the configured path."""
         return self._last_provider_status
 
+    @property
+    def last_snapshot(self) -> AviationSnapshot | None:
+        """Latest normalized aviation snapshot produced by the factory."""
+        return self._last_snapshot
+
     async def get_snapshot(self) -> AviationSnapshot:
         """
         Return a normalized aviation snapshot from the configured provider path.
@@ -71,6 +77,7 @@ class ProviderFactory:
         try:
             snapshot = await provider.get_snapshot()
             self._last_provider_status = snapshot.provider_status
+            self._last_snapshot = snapshot
             self._active_provider_key = provider.provider_key
             return snapshot
         except ProviderUnavailableError as exc:
@@ -105,6 +112,7 @@ class ProviderFactory:
             logger.exception("Unexpected provider error.")
 
         snapshot = await self._simulated.get_snapshot()
+        self._last_snapshot = snapshot
         self._active_provider_key = self._simulated.provider_key
         return snapshot
 

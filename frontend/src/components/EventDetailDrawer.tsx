@@ -58,6 +58,8 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
           <span className="event-detail__eyebrow">
             {selectedEvent.kind === "alert"
               ? "Alert Detail"
+              : selectedEvent.kind === "aircraft"
+                ? "Aircraft Detail"
               : selectedEvent.kind === "incident"
                 ? "Incident Detail"
                 : "Selection Detail"}
@@ -121,6 +123,68 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
                 </button>
               )}
             </div>
+          </>
+        )}
+
+        {selectedEvent.kind === "aircraft" && (
+          <>
+            <DetailRow
+              label="Callsign"
+              value={selectedEvent.callsign ?? "Not available from current provider"}
+            />
+            <DetailRow
+              label="Identifier"
+              value={
+                selectedEvent.flightIdentifier ??
+                selectedEvent.callsign ??
+                selectedEvent.id
+              }
+            />
+            <DetailRow label="Observed" value={formatTime(selectedEvent.timestamp)} />
+            <DetailRow
+              label="Position"
+              value={`${formatCoordinate(selectedEvent.latitude)}, ${formatCoordinate(selectedEvent.longitude)}`}
+            />
+            <DetailRow
+              label="Altitude"
+              value={
+                selectedEvent.altitude != null
+                  ? `${selectedEvent.altitude.toLocaleString()} ft`
+                  : "Altitude unavailable from current provider"
+              }
+            />
+            <DetailRow
+              label="Speed"
+              value={
+                selectedEvent.speed != null
+                  ? `${selectedEvent.speed.toLocaleString()} kt`
+                  : "Speed unavailable from current provider"
+              }
+            />
+            <DetailRow
+              label="Heading"
+              value={
+                selectedEvent.heading != null
+                  ? `${selectedEvent.heading.toFixed(1)} deg`
+                  : "Heading unavailable from current provider"
+              }
+            />
+            <DetailRow
+              label="Provider"
+              value={selectedEvent.providerName ?? selectedEvent.source}
+            />
+            <DetailRow
+              label="Origin"
+              value={selectedEvent.routeOrigin ?? "Route unavailable from current provider"}
+            />
+            <DetailRow
+              label="Destination"
+              value={
+                selectedEvent.routeDestination ??
+                "Route unavailable from current provider"
+              }
+            />
+            <DetailRow label="Aircraft ID" value={selectedEvent.id} />
           </>
         )}
 

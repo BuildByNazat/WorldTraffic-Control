@@ -75,6 +75,7 @@ def to_aircraft_feature_collection(snapshot: AviationSnapshot) -> AircraftFeatur
                 properties=AircraftProperties(
                     id=flight.stable_id,
                     callsign=flight.callsign or flight.flight_identifier,
+                    flight_identifier=flight.flight_identifier or flight.callsign,
                     altitude=round(altitude_ft, 0),
                     heading=round(heading_deg, 1),
                     speed=round(speed_kts, 1),

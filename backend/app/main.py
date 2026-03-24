@@ -17,6 +17,8 @@ from app.schemas import (
     AnalyticsOverview,
     AnalyticsTimeseriesResponse,
     AircraftHistoryResponse,
+    AircraftSearchResponse,
+    AircraftSearchResult,
     AlertStatusResponse,
     AlertsResponse,
     AlertsSummary,
@@ -45,6 +47,40 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+
+def _normalized_aircraft_tokens(
+    callsign: Optional[str], flight_identifier: Optional[str], stable_id: str, source: str
+) -> list[str]:
+    return [
+        value.strip().lower()
+        for value in (callsign, flight_identifier, stable_id, source)
+        if value and value.strip()
+    ]
+
+
+def _aircraft_match_score(
+    query: str,
+    callsign: Optional[str],
+    flight_identifier: Optional[str],
+    stable_id: str,
+    source: str,
+) -> int:
+    tokens = _normalized_aircraft_tokens(callsign, flight_identifier, stable_id, source)
+    if not tokens:
+        return -1
+
+    if any(token == query for token in tokens):
+        return 400
+    if callsign and callsign.lower().startswith(query):
+        return 320
+    if flight_identifier and flight_identifier.lower().startswith(query):
+        return 300
+    if stable_id.lower().startswith(query):
+        return 280
+    if any(query in token for token in tokens):
+        return 200
+    return -1
 
 
 @asynccontextmanager
@@ -169,6 +205,69 @@ async def service_status():
 @app.get("/api/snapshot", tags=["data"], response_model=CombinedFeatureCollection)
 async def snapshot():
     return await build_combined_snapshot()
+
+
+@app.get("/api/aviation/search", tags=["aviation"], response_model=AircraftSearchResponse)
+async def aviation_search(
+    q: str = Query(..., min_length=1, max_length=64),
+    limit: int = Query(default=8, ge=1, le=25),
+):
+    normalized_query = q.strip().lower()
+    snapshot = factory.last_snapshot or await factory.get_snapshot()
+
+    ranked: list[tuple[int, AircraftSearchResult]] = []
+    provider_label = (
+        snapshot.provider_status.provider_label if snapshot.provider_status else None
+    )
+
+    for flight in snapshot.flights:
+        score = _aircraft_match_score(
+            normalized_query,
+            flight.callsign,
+            flight.flight_identifier,
+            flight.stable_id,
+            flight.provider,
+        )
+        if score < 0:
+            continue
+
+        ranked.append(
+            (
+                score,
+                AircraftSearchResult(
+                    id=flight.stable_id,
+                    callsign=flight.callsign,
+                    flight_identifier=flight.flight_identifier,
+                    latitude=flight.latitude,
+                    longitude=flight.longitude,
+                    altitude=round(flight.altitude_ft, 0)
+                    if flight.altitude_ft is not None
+                    else None,
+                    heading=round(flight.heading_deg, 1)
+                    if flight.heading_deg is not None
+                    else None,
+                    speed=round(flight.ground_speed_kts, 1)
+                    if flight.ground_speed_kts is not None
+                    else None,
+                    source=flight.provider,
+                    provider_name=provider_label or flight.provider,
+                    observed_at=flight.observed_at,
+                    route_origin=flight.route_origin,
+                    route_destination=flight.route_destination,
+                    freshness_seconds=flight.freshness_seconds,
+                    stale=flight.stale,
+                ),
+            )
+        )
+
+    ranked.sort(
+        key=lambda item: (
+            -item[0],
+            item[1].callsign or item[1].flight_identifier or item[1].id,
+        )
+    )
+    results = [result for _, result in ranked[:limit]]
+    return AircraftSearchResponse(query=q.strip(), count=len(results), results=results)
 
 
 @app.get("/api/cameras", tags=["cameras"], response_model=CameraList)

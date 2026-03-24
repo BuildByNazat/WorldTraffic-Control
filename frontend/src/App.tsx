@@ -16,15 +16,24 @@ import AlertsPanel from "./components/AlertsPanel";
 import EventDetailDrawer from "./components/EventDetailDrawer";
 import IncidentsPanel from "./components/IncidentsPanel";
 import LayerControls from "./components/LayerControls";
-import { useLiveFeed, isAircraftFeature } from "./hooks/useLiveFeed";
+import {
+  useLiveFeed,
+  isAircraftFeature,
+  type AircraftFeature,
+} from "./hooks/useLiveFeed";
 import { useFilteredHistory } from "./hooks/useFilteredHistory";
 import { useHistoryFeed } from "./hooks/useHistoryFeed";
+import {
+  useAircraftSearch,
+  type AircraftSearchResult,
+} from "./hooks/useAircraftSearch";
 import { useAlerts, type AlertRecord } from "./hooks/useAlerts";
 import { useIncidents, type IncidentRecord } from "./hooks/useIncidents";
 import { useMapLayers } from "./hooks/useMapLayers";
 import { useServiceStatus } from "./hooks/useServiceStatus";
 import { useTheme } from "./hooks/useTheme";
 import type {
+  SelectedAircraftDetail,
   SelectedAlertDetail,
   SelectedEventDetail,
   SelectedIncidentDetail,
@@ -45,6 +54,60 @@ const RAIL_ICONS: Record<RailPanel, string> = {
   incidents: "IN",
   layers: "LY",
 };
+
+function buildAircraftSelectionFromFeature(feature: AircraftFeature): SelectedAircraftDetail {
+  return {
+    kind: "aircraft",
+    id: feature.properties.id,
+    label:
+      feature.properties.callsign ??
+      feature.properties.flight_identifier ??
+      feature.properties.id,
+    timestamp: feature.properties.observed_at ?? new Date().toISOString(),
+    latitude: feature.geometry.coordinates[1],
+    longitude: feature.geometry.coordinates[0],
+    source: feature.properties.source,
+    cameraId: null,
+    featureIds: [feature.properties.id],
+    callsign: feature.properties.callsign,
+    flightIdentifier:
+      feature.properties.flight_identifier ?? feature.properties.callsign ?? null,
+    altitude: feature.properties.altitude,
+    speed: feature.properties.speed,
+    heading: feature.properties.heading,
+    providerName: feature.properties.provider_name ?? null,
+    routeOrigin: feature.properties.route_origin ?? null,
+    routeDestination: feature.properties.route_destination ?? null,
+    freshnessSeconds: feature.properties.freshness_seconds ?? null,
+    stale: feature.properties.stale ?? false,
+  };
+}
+
+function buildAircraftSelectionFromSearchResult(
+  result: AircraftSearchResult
+): SelectedAircraftDetail {
+  return {
+    kind: "aircraft",
+    id: result.id,
+    label: result.callsign ?? result.flight_identifier ?? result.id,
+    timestamp: result.observed_at ?? new Date().toISOString(),
+    latitude: result.latitude,
+    longitude: result.longitude,
+    source: result.source,
+    cameraId: null,
+    featureIds: [result.id],
+    callsign: result.callsign,
+    flightIdentifier: result.flight_identifier ?? result.callsign,
+    altitude: result.altitude,
+    speed: result.speed,
+    heading: result.heading,
+    providerName: result.provider_name,
+    routeOrigin: result.route_origin,
+    routeDestination: result.route_destination,
+    freshnessSeconds: result.freshness_seconds,
+    stale: result.stale,
+  };
+}
 
 function isSameSelection(
   current: SelectedEventDetail | null,
@@ -68,9 +131,12 @@ const App: React.FC = () => {
   const [activeDrawer, setActiveDrawer] = useState<RailPanel | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [isReplayPlaying, setIsReplayPlaying] = useState(false);
+  const [aircraftQuery, setAircraftQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const historyFilters = useFilteredHistory();
   const historyFeed = useHistoryFeed(mode === "history", historyFilters.filters);
+  const aircraftSearch = useAircraftSearch(aircraftQuery, mode === "live");
   const alertsState = useAlerts(true);
   const incidentsState = useIncidents(true);
   const mapLayers = useMapLayers();
@@ -150,6 +216,30 @@ const App: React.FC = () => {
     selectAlert(nextAlert, false);
   }, [alertsState.alerts, selectedEvent]);
 
+  useEffect(() => {
+    if (selectedEvent?.kind !== "aircraft") return;
+
+    const nextAircraft = data?.features.find(
+      (feature): feature is AircraftFeature =>
+        isAircraftFeature(feature) && feature.properties.id === selectedEvent.id
+    );
+    if (!nextAircraft) return;
+
+    const nextSelection = buildAircraftSelectionFromFeature(nextAircraft);
+    if (
+      selectedEvent.timestamp === nextSelection.timestamp &&
+      selectedEvent.altitude === nextSelection.altitude &&
+      selectedEvent.speed === nextSelection.speed &&
+      selectedEvent.heading === nextSelection.heading &&
+      selectedEvent.latitude === nextSelection.latitude &&
+      selectedEvent.longitude === nextSelection.longitude
+    ) {
+      return;
+    }
+
+    applySelection(nextSelection);
+  }, [data, selectedEvent]);
+
   function clearSelection() {
     setSelectedEvent(null);
     setHighlight(null);
@@ -171,6 +261,8 @@ const App: React.FC = () => {
     }
 
     setMode(next);
+    setAircraftQuery("");
+    setSearchOpen(false);
     clearSelection();
   }
 
@@ -180,6 +272,25 @@ const App: React.FC = () => {
       return;
     }
     applySelection(event);
+  }
+
+  function selectAircraft(detail: SelectedAircraftDetail, allowToggle = true) {
+    if (allowToggle && isSameSelection(selectedEvent, detail)) {
+      clearSelection();
+      return;
+    }
+
+    setSearchOpen(false);
+    applySelection(detail);
+  }
+
+  function handleSelectAircraftFromMap(feature: AircraftFeature) {
+    selectAircraft(buildAircraftSelectionFromFeature(feature));
+  }
+
+  function handleSelectAircraftFromSearch(result: AircraftSearchResult) {
+    setAircraftQuery(result.callsign ?? result.flight_identifier ?? result.id);
+    selectAircraft(buildAircraftSelectionFromSearchResult(result), false);
   }
 
   function toggleDrawer(panel: RailPanel) {
@@ -295,6 +406,59 @@ const App: React.FC = () => {
       </header>
 
       <main className="app-main">
+        {mode === "live" && (
+          <div className="app-flight-search">
+            <label className="app-flight-search__field">
+              <span className="app-flight-search__label">Find Flight</span>
+              <input
+                type="search"
+                value={aircraftQuery}
+                onChange={(event) => {
+                  setAircraftQuery(event.target.value);
+                  setSearchOpen(true);
+                }}
+                onFocus={() => setSearchOpen(true)}
+                placeholder="Callsign, aircraft id, or provider"
+                aria-label="Search flights or aircraft"
+              />
+            </label>
+
+            {searchOpen && aircraftQuery.trim().length >= 2 && (
+              <div className="app-flight-search__results" role="listbox">
+                {aircraftSearch.loading && (
+                  <div className="app-flight-search__state">Searching active aircraft...</div>
+                )}
+                {!aircraftSearch.loading && aircraftSearch.error && (
+                  <div className="app-flight-search__state">{aircraftSearch.error}</div>
+                )}
+                {!aircraftSearch.loading &&
+                  !aircraftSearch.error &&
+                  aircraftSearch.results.length === 0 && (
+                    <div className="app-flight-search__state">
+                      No active aircraft matched the current query.
+                    </div>
+                  )}
+                {!aircraftSearch.loading &&
+                  aircraftSearch.results.map((result) => (
+                    <button
+                      key={result.id}
+                      type="button"
+                      className="app-flight-search__result"
+                      onClick={() => handleSelectAircraftFromSearch(result)}
+                    >
+                      <span className="app-flight-search__result-title">
+                        {result.callsign ?? result.flight_identifier ?? result.id}
+                      </span>
+                      <span className="app-flight-search__result-meta">
+                        {result.id} / {result.provider_name ?? result.source}
+                      </span>
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="app-map-stage">
           <LiveMap
             data={data}
@@ -306,12 +470,17 @@ const App: React.FC = () => {
               selectedEvent?.kind === "history"
                 ? "replay"
                 : selectedEvent?.kind === "alert" ||
+                    selectedEvent?.kind === "aircraft" ||
                     selectedEvent?.kind === "incident"
                   ? "selected"
                   : null
             }
             selectedAlertId={selectedEvent?.kind === "alert" ? selectedEvent.id : null}
+            selectedAircraftId={
+              selectedEvent?.kind === "aircraft" ? selectedEvent.id : null
+            }
             onSelectAlert={selectAlert}
+            onSelectAircraft={handleSelectAircraftFromMap}
           />
         </div>
 

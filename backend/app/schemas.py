@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 class AircraftProperties(BaseModel):
     id: str
     callsign: Optional[str] = None
+    flight_identifier: Optional[str] = None
     altitude: float = Field(..., description="Altitude in feet")
     heading: float = Field(..., ge=0, lt=360)
     speed: float = Field(..., description="Speed in knots")
@@ -22,6 +23,30 @@ class AircraftProperties(BaseModel):
     provider_name: Optional[str] = None
     freshness_seconds: Optional[float] = None
     stale: bool = False
+
+
+class AircraftSearchResult(BaseModel):
+    id: str
+    callsign: Optional[str] = None
+    flight_identifier: Optional[str] = None
+    latitude: float
+    longitude: float
+    altitude: Optional[float] = None
+    heading: Optional[float] = None
+    speed: Optional[float] = None
+    source: str
+    provider_name: Optional[str] = None
+    observed_at: Optional[datetime] = None
+    route_origin: Optional[str] = None
+    route_destination: Optional[str] = None
+    freshness_seconds: Optional[float] = None
+    stale: bool = False
+
+
+class AircraftSearchResponse(BaseModel):
+    query: str
+    count: int
+    results: List[AircraftSearchResult]
 
 
 class AircraftGeometry(BaseModel):

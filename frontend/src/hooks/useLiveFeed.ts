@@ -16,6 +16,7 @@ import { WS_URL, WS_RECONNECT_DELAY_MS } from "../config";
 export interface AircraftProperties {
   id: string;
   callsign: string | null;
+  flight_identifier?: string | null;
   altitude: number;
   heading: number;
   speed: number;
