@@ -7,9 +7,9 @@ WorldTraffic Control is an operator-oriented traffic monitoring app with live ma
 - Backend: FastAPI, SQLAlchemy, SQLite, httpx
 - Frontend: React, Vite, TypeScript, Leaflet
 
-## Quick local demo
+## Quick local evaluation
 
-The fastest demo path uses the default simulated aircraft provider and no external API keys.
+The default path now uses OpenSky as the first real-data evaluation provider. If OpenSky is unavailable, the app falls back internally to the simulated feed so the product remains usable.
 
 1. Start the backend:
 
@@ -32,8 +32,9 @@ npm run dev
 
 3. Open `http://localhost:5173`
 
-Demo-safe defaults:
-- aircraft use the built-in simulated provider unless `AVIATION_PROVIDER=opensky`
+Evaluation-first defaults:
+- aircraft use OpenSky evaluation mode by default, anonymously if credentials are not set yet
+- the simulated feed remains available as an internal fallback or an explicit developer override
 - camera vision stays optional unless `GEMINI_API_KEY` is configured
 - the dashboard remains usable even with no detections or no promoted incidents
 
@@ -99,12 +100,12 @@ Configured in `backend/.env` or project-root `.env`.
 
 - `AVIATION_DATA_MODE`
   - Optional
-  - Default: `demo`
+  - Default: `evaluation`
   - Valid: `demo`, `evaluation`, `commercial`
   - `provider` is still accepted as a legacy alias and is normalized automatically
 - `AVIATION_PROVIDER`
   - Optional
-  - Default: `simulated`
+  - Default: `opensky`
   - Valid: `simulated`, `opensky`, `commercial_stub`
 - `AIRCRAFT_PROVIDER`
   - Optional legacy alias for `AVIATION_PROVIDER`
@@ -226,25 +227,26 @@ Recommended production pattern:
 
 - `demo`
   - Use `AVIATION_PROVIDER=simulated`
-  - Best for local UI work, demos, and safe fallbacks
+  - Best for explicit developer demos and offline fallback testing
 - `evaluation`
   - Use `AVIATION_PROVIDER=opensky`
-  - Intended for real-provider testing and credential handoff
+  - Intended for the current real-data product path and credential handoff
   - Works anonymously or with real OpenSky credentials
   - Filters obviously stale tracks while keeping simulated fallback available if OpenSky fails
 - `commercial`
   - Use `AVIATION_PROVIDER=commercial_stub`
   - Keeps the integration boundary ready for a licensed provider without pretending one is finalized
 
-## Recommended demo setup
+## Recommended evaluation setup
 
-For the most reliable public demo:
-- keep `AVIATION_PROVIDER=simulated` unless you specifically want live OpenSky evaluation data
+For the current aviation-first product path:
+- keep `AVIATION_PROVIDER=opensky`
+- use `AVIATION_DATA_MODE=evaluation`
+- add OpenSky credentials when available, but anonymous mode is acceptable for first evaluation passes
+- use `AVIATION_PROVIDER=simulated` only when you intentionally want a developer/demo override
 - leave `GEMINI_API_KEY` unset unless you have a stable camera image source ready
 - start in Live mode to show the map, overlays, alerts rail, and polished shell
 - switch to History mode to show replay, analytics, filters, incidents, and export
-
-This avoids rate-limit or external API surprises while still showing the full product flow.
 
 ## Production deployment notes
 
@@ -254,8 +256,8 @@ For a first real public deployment:
 - set `PUBLIC_BASE_URL` to the public HTTPS URL
 - replace default localhost `CORS_ORIGINS` with the real public frontend origin if you are serving frontend and backend separately
 - persist `DB_PATH` on durable storage; SQLite is acceptable for a single-node first deployment but not for multi-instance write-heavy scaling
-- keep `AVIATION_PROVIDER=simulated` until OpenSky credentials and upstream reliability are ready for public use
-- when you are ready to evaluate real aviation data, switch to `AVIATION_DATA_MODE=evaluation` and `AVIATION_PROVIDER=opensky`
+- keep `AVIATION_PROVIDER=opensky` as the normal aviation path
+- rely on the simulated provider only as an internal safety net or explicit development override
 - leave `GEMINI_API_KEY` unset if camera analysis is not part of the launch plan; the UI will present this clearly instead of failing
 
 ## What still needs replacement before a true commercial launch

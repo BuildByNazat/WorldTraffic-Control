@@ -75,17 +75,17 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
       ? `${serviceStatus.aviation_provider_label} (anonymous)`
       : serviceStatus.aviation_provider_label
     : serviceStatus?.simulated_mode
-      ? "Simulated feed"
+      ? "Fallback feed"
       : "Provider unavailable";
   const sourceLabel =
     serviceStatus?.aviation_active_source === "simulated" &&
     serviceStatus.aviation_provider !== "simulated"
       ? "Simulated fallback"
-      : serviceStatus?.aviation_active_source === "opensky"
-        ? "OpenSky evaluation"
+        : serviceStatus?.aviation_active_source === "opensky"
+          ? "OpenSky evaluation"
         : serviceStatus?.aviation_active_source === "commercial_stub"
           ? "Commercial placeholder"
-          : "Simulated demo";
+          : "Fallback feed";
   const providerHealthLabel = !serviceStatus
     ? "Checking"
     : serviceStatus.aviation_provider_healthy
@@ -105,7 +105,10 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
         : !serviceStatus
           ? "Loading provider and system readiness details."
       : serviceStatus?.simulated_mode
-        ? "Running on the built-in simulated aviation feed. Switch to evaluation mode when real provider credentials are ready."
+        ? serviceStatus.aviation_provider === "simulated"
+          ? "Developer demo mode is active. Switch to OpenSky evaluation mode for the real-data product path."
+          : serviceStatus.aviation_provider_message ??
+            "Live provider data is currently unavailable, so the app is using its internal fallback feed."
         : serviceStatus?.aviation_provider_degraded
           ? serviceStatus.aviation_provider_message ??
             "The configured aviation provider degraded and the app is using a safe fallback path."

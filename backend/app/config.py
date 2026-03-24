@@ -104,9 +104,9 @@ def _resolve_db_path(raw_path: Optional[str]) -> str:
 @dataclass(frozen=True)
 class Settings:
     app_env: str = "development"
-    aircraft_provider: str = "simulated"
-    aviation_data_mode: str = "demo"
-    aviation_provider: str = "simulated"
+    aircraft_provider: str = "opensky"
+    aviation_data_mode: str = "evaluation"
+    aviation_provider: str = "opensky"
     commercial_provider_name: Optional[str] = None
     commercial_api_base_url: Optional[str] = None
     commercial_api_key: Optional[str] = None
@@ -140,14 +140,14 @@ def _load_settings() -> Settings:
     provider = (
         _get_optional_str("AVIATION_PROVIDER")
         or _get_optional_str("AIRCRAFT_PROVIDER")
-        or "simulated"
+        or "opensky"
     ).lower()
     if provider not in {"simulated", "opensky", "commercial_stub"}:
         logger.warning(
-            "Unsupported aviation provider %r. Falling back to 'simulated'.",
+            "Unsupported aviation provider %r. Falling back to 'opensky'.",
             provider,
         )
-        provider = "simulated"
+        provider = "opensky"
 
     raw_aviation_mode = os.getenv(
         "AVIATION_DATA_MODE",
