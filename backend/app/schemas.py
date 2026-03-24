@@ -221,6 +221,7 @@ class CombinedFeatureCollection(BaseModel):
 class ServiceStatus(BaseModel):
     status: Literal["ok"] = "ok"
     app_env: str
+    auth_signup_enabled: bool
     aircraft_provider: str
     aviation_data_mode: str
     aviation_provider: str

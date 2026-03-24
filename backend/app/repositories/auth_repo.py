@@ -12,6 +12,7 @@ from typing import Optional, Tuple
 
 from sqlalchemy import delete, select
 
+from app.config import settings
 from app.db import async_session_factory
 from app.models_db import UserAccount, UserSession
 from app.schemas import UserProfile
@@ -95,7 +96,7 @@ async def authenticate_user(email: str, password: str) -> Optional[UserProfile]:
 
 
 async def create_session_for_user(user_id: int) -> str:
-    raw_token = secrets.token_urlsafe(32)
+    raw_token = secrets.token_urlsafe(settings.auth_session_token_bytes)
     async with async_session_factory() as session:
         row = UserSession(
             user_id=user_id,

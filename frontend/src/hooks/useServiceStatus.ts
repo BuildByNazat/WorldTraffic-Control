@@ -4,6 +4,7 @@ import { API_BASE } from "../config";
 export interface ServiceStatusResponse {
   status: "ok";
   app_env: "development" | "production" | string;
+  auth_signup_enabled: boolean;
   aircraft_provider: string;
   aviation_data_mode: string;
   aviation_provider: string;

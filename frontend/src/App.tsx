@@ -209,6 +209,7 @@ const App: React.FC = () => {
   const mapLayers = useMapLayers();
   const serviceStatusState = useServiceStatus(true);
   const watchlistState = useWatchlist(authState.token);
+  const signupEnabled = serviceStatusState.status?.auth_signup_enabled ?? true;
 
   const aircraftCount = data?.features.filter(isAircraftFeature).length ?? 0;
   const detectionCount =
@@ -278,6 +279,12 @@ const App: React.FC = () => {
       setAuthPassword("");
     }
   }, [authState.isAuthenticated]);
+
+  useEffect(() => {
+    if (!signupEnabled && authMode === "signup") {
+      setAuthMode("signin");
+    }
+  }, [authMode, signupEnabled]);
 
   useEffect(() => {
     setWatchlistFeedback(watchlistState.error);
@@ -644,19 +651,26 @@ const App: React.FC = () => {
                       >
                         Sign in
                       </button>
-                      <button
-                        type="button"
-                        className={`account-menu__tab${
-                          authMode === "signup" ? " account-menu__tab--active" : ""
-                        }`}
-                        onClick={() => {
-                          authState.clearError();
-                          setAuthMode("signup");
-                        }}
-                      >
-                        Sign up
-                      </button>
+                      {signupEnabled && (
+                        <button
+                          type="button"
+                          className={`account-menu__tab${
+                            authMode === "signup" ? " account-menu__tab--active" : ""
+                          }`}
+                          onClick={() => {
+                            authState.clearError();
+                            setAuthMode("signup");
+                          }}
+                        >
+                          Sign up
+                        </button>
+                      )}
                     </div>
+                    {!signupEnabled && (
+                      <div className="account-menu__meta">
+                        Signups are closed for this private beta. Use an invited account.
+                      </div>
+                    )}
                     <label className="account-menu__field">
                       <span>Email</span>
                       <input

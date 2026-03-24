@@ -81,6 +81,36 @@ def _get_float(name: str, default: float, *, minimum: Optional[float] = None) ->
     return value
 
 
+def _get_int(name: str, default: int, *, minimum: Optional[int] = None) -> int:
+    raw_value = os.getenv(name)
+    if raw_value is None or raw_value.strip() == "":
+        return default
+
+    try:
+        value = int(raw_value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer, received {raw_value!r}.") from exc
+
+    if minimum is not None and value < minimum:
+        raise ValueError(f"{name} must be >= {minimum}, received {value}.")
+
+    return value
+
+
+def _get_bool(name: str, default: bool) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None or raw_value.strip() == "":
+        return default
+    value = raw_value.strip().lower()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(
+        f"{name} must be a boolean value such as true/false, received {raw_value!r}."
+    )
+
+
 def _get_csv(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
     raw_value = os.getenv(name)
     if raw_value is None or raw_value.strip() == "":
@@ -118,6 +148,8 @@ class Settings:
     db_path: str = str((BACKEND_DIR / "data" / "worldtraffic.db").resolve())
     cors_origins: tuple[str, ...] = DEFAULT_LOCAL_CORS_ORIGINS
     public_base_url: Optional[str] = None
+    auth_signup_enabled: bool = True
+    auth_session_token_bytes: int = 32
     default_cameras: list = field(
         default_factory=lambda: [
             {
@@ -191,6 +223,30 @@ def _load_settings() -> Settings:
             "Set CORS_ORIGINS for the real public frontend origin."
         )
 
+    public_base_url = _get_optional_str("PUBLIC_BASE_URL")
+    if app_env == "production":
+        if not public_base_url:
+            logger.warning(
+                "APP_ENV=production is missing PUBLIC_BASE_URL. "
+                "Set it to the public HTTPS app URL for clearer deployment status messaging."
+            )
+        elif not public_base_url.startswith("https://"):
+            logger.warning(
+                "APP_ENV=production is using a non-HTTPS PUBLIC_BASE_URL (%s). "
+                "Use the final public HTTPS URL for beta deployment.",
+                public_base_url,
+            )
+
+    auth_signup_enabled = _get_bool(
+        "AUTH_SIGNUP_ENABLED",
+        default=app_env != "production",
+    )
+    if app_env == "production" and auth_signup_enabled:
+        logger.warning(
+            "AUTH_SIGNUP_ENABLED is true in production. "
+            "Disable public signups for an invite-only private beta if that is the intended rollout."
+        )
+
     return Settings(
         app_env=app_env,
         aircraft_provider=provider,
@@ -206,7 +262,11 @@ def _load_settings() -> Settings:
         gemini_api_key=_get_optional_str("GEMINI_API_KEY"),
         db_path=_resolve_db_path(os.getenv("DB_PATH")),
         cors_origins=cors_origins,
-        public_base_url=_get_optional_str("PUBLIC_BASE_URL"),
+        public_base_url=public_base_url,
+        auth_signup_enabled=auth_signup_enabled,
+        auth_session_token_bytes=_get_int(
+            "AUTH_SESSION_TOKEN_BYTES", 32, minimum=16
+        ),
     )
 
 
@@ -227,4 +287,6 @@ GEMINI_API_KEY: Optional[str] = settings.gemini_api_key
 DB_PATH: str = settings.db_path
 CORS_ORIGINS: tuple[str, ...] = settings.cors_origins
 PUBLIC_BASE_URL: Optional[str] = settings.public_base_url
+AUTH_SIGNUP_ENABLED: bool = settings.auth_signup_enabled
+AUTH_SESSION_TOKEN_BYTES: int = settings.auth_session_token_bytes
 DEFAULT_CAMERAS: list = settings.default_cameras

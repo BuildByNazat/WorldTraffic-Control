@@ -329,6 +329,7 @@ async def service_status():
     provider_status = factory.last_provider_status
     return ServiceStatus(
         app_env=settings.app_env,
+        auth_signup_enabled=settings.auth_signup_enabled,
         aircraft_provider=factory.primary_type,
         aviation_data_mode=settings.aviation_data_mode,
         aviation_provider=settings.aviation_provider,
@@ -435,6 +436,12 @@ async def auth_signup(payload: AuthCredentialsRequest):
     from sqlalchemy.exc import IntegrityError
 
     from app.repositories.auth_repo import create_session_for_user, create_user, get_user_by_email
+
+    if not settings.auth_signup_enabled:
+        raise HTTPException(
+            status_code=403,
+            detail="Signups are closed for this private beta. Use an invited account.",
+        )
 
     email = payload.email.strip().lower()
     _validate_credentials(email, payload.password)

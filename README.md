@@ -37,6 +37,7 @@ Evaluation-first defaults:
 - the simulated feed remains available as an internal fallback or an explicit developer override
 - camera vision stays optional unless `GEMINI_API_KEY` is configured
 - the dashboard remains usable even with no detections or no promoted incidents
+- browser auth uses database-backed bearer sessions; no shared JWT secret is required for the current private beta
 
 ## Local setup
 
@@ -147,6 +148,14 @@ Configured in `backend/.env` or project-root `.env`.
   - Optional
   - Comma-separated list of allowed frontend origins
   - For public deployment, replace localhost defaults with the real frontend origin
+- `AUTH_SIGNUP_ENABLED`
+  - Optional
+  - Default: `true` in development, `false` in production
+  - Use `false` for an invite-only private beta
+- `AUTH_SESSION_TOKEN_BYTES`
+  - Optional
+  - Default: `32`
+  - Controls entropy for database-backed bearer session tokens
 
 ### Frontend
 
@@ -220,6 +229,7 @@ Recommended production pattern:
 - reverse-proxy `/api` and `/ws/live` to the FastAPI backend
 - set `CORS_ORIGINS` to the deployed frontend origin if frontend and backend are on different origins
 - use `APP_ENV=production`
+- set `AUTH_SIGNUP_ENABLED=false` if the beta should stay invite-only
 - expose health endpoints at `/healthz` and `/readyz`
 - keep the same-origin frontend/API model where practical
 
@@ -255,6 +265,8 @@ For a first real public deployment:
 - set `APP_ENV=production`
 - set `PUBLIC_BASE_URL` to the public HTTPS URL
 - replace default localhost `CORS_ORIGINS` with the real public frontend origin if you are serving frontend and backend separately
+- disable public signups with `AUTH_SIGNUP_ENABLED=false` unless open beta signup is intentional
+- keep `AUTH_SESSION_TOKEN_BYTES` at `32` or higher for production-facing environments
 - persist `DB_PATH` on durable storage; SQLite is acceptable for a single-node first deployment but not for multi-instance write-heavy scaling
 - keep `AVIATION_PROVIDER=opensky` as the normal aviation path
 - rely on the simulated provider only as an internal safety net or explicit development override
