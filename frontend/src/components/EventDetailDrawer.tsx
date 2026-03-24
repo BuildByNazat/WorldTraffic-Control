@@ -11,7 +11,12 @@ interface EventDetailDrawerProps {
 }
 
 function formatTime(value: string): string {
-  return new Date(value).toLocaleString(undefined, {
+  if (!value) return "Timestamp unavailable from current provider";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Timestamp unavailable from current provider";
+  }
+  return date.toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     hour: "2-digit",

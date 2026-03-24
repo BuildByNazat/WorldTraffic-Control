@@ -50,11 +50,15 @@ logger = logging.getLogger(__name__)
 
 
 def _normalized_aircraft_tokens(
-    callsign: Optional[str], flight_identifier: Optional[str], stable_id: str, source: str
+    callsign: Optional[str],
+    flight_identifier: Optional[str],
+    stable_id: str,
+    source: str,
+    provider_name: Optional[str] = None,
 ) -> list[str]:
     return [
         value.strip().lower()
-        for value in (callsign, flight_identifier, stable_id, source)
+        for value in (callsign, flight_identifier, stable_id, source, provider_name)
         if value and value.strip()
     ]
 
@@ -65,8 +69,11 @@ def _aircraft_match_score(
     flight_identifier: Optional[str],
     stable_id: str,
     source: str,
+    provider_name: Optional[str] = None,
 ) -> int:
-    tokens = _normalized_aircraft_tokens(callsign, flight_identifier, stable_id, source)
+    tokens = _normalized_aircraft_tokens(
+        callsign, flight_identifier, stable_id, source, provider_name
+    )
     if not tokens:
         return -1
 
@@ -213,6 +220,9 @@ async def aviation_search(
     limit: int = Query(default=8, ge=1, le=25),
 ):
     normalized_query = q.strip().lower()
+    if not normalized_query:
+        return AircraftSearchResponse(query="", count=0, results=[])
+
     snapshot = factory.last_snapshot or await factory.get_snapshot()
 
     ranked: list[tuple[int, AircraftSearchResult]] = []
@@ -227,6 +237,7 @@ async def aviation_search(
             flight.flight_identifier,
             flight.stable_id,
             flight.provider,
+            provider_label,
         )
         if score < 0:
             continue

@@ -63,7 +63,7 @@ function buildAircraftSelectionFromFeature(feature: AircraftFeature): SelectedAi
       feature.properties.callsign ??
       feature.properties.flight_identifier ??
       feature.properties.id,
-    timestamp: feature.properties.observed_at ?? new Date().toISOString(),
+    timestamp: feature.properties.observed_at ?? "",
     latitude: feature.geometry.coordinates[1],
     longitude: feature.geometry.coordinates[0],
     source: feature.properties.source,
@@ -90,7 +90,7 @@ function buildAircraftSelectionFromSearchResult(
     kind: "aircraft",
     id: result.id,
     label: result.callsign ?? result.flight_identifier ?? result.id,
-    timestamp: result.observed_at ?? new Date().toISOString(),
+    timestamp: result.observed_at ?? "",
     latitude: result.latitude,
     longitude: result.longitude,
     source: result.source,
