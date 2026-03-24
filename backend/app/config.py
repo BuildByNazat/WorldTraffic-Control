@@ -54,6 +54,17 @@ def _get_choice(name: str, default: str, allowed: set[str]) -> str:
     return value
 
 
+def _normalize_aviation_mode(raw_mode: str, provider: str) -> str:
+    value = raw_mode.strip().lower()
+    if value == "provider":
+        return "commercial" if provider == "commercial_stub" else "evaluation"
+    if value not in {"demo", "evaluation", "commercial"}:
+        raise ValueError(
+            "AVIATION_DATA_MODE must be one of ['commercial', 'demo', 'evaluation', 'provider']."
+        )
+    return value
+
+
 def _get_float(name: str, default: float, *, minimum: Optional[float] = None) -> float:
     raw_value = os.getenv(name)
     if raw_value is None or raw_value.strip() == "":
@@ -138,19 +149,40 @@ def _load_settings() -> Settings:
         )
         provider = "simulated"
 
-    aviation_data_mode = _get_choice(
+    raw_aviation_mode = os.getenv(
         "AVIATION_DATA_MODE",
-        "demo" if provider == "simulated" else "provider",
-        {"demo", "provider"},
+        "demo" if provider == "simulated" else (
+            "commercial" if provider == "commercial_stub" else "evaluation"
+        ),
     )
-    if aviation_data_mode == "provider" and provider == "simulated":
+    aviation_data_mode = _normalize_aviation_mode(raw_aviation_mode, provider)
+    if aviation_data_mode != "demo" and provider == "simulated":
         logger.info(
-            "AVIATION_DATA_MODE=provider with AVIATION_PROVIDER=simulated. "
-            "Running in demo mode until a real provider is configured."
+            "AVIATION_DATA_MODE=%s with AVIATION_PROVIDER=simulated. "
+            "Running in demo mode until a real provider is configured.",
+            aviation_data_mode,
         )
+        aviation_data_mode = "demo"
 
-    if provider == "opensky" and not _get_optional_str("OPENSKY_USERNAME"):
-        logger.info("OpenSky is enabled without credentials. Anonymous rate limits apply.")
+    opensky_username = _get_optional_str("OPENSKY_USERNAME")
+    opensky_password = _get_optional_str("OPENSKY_PASSWORD")
+    if provider == "opensky":
+        if bool(opensky_username) ^ bool(opensky_password):
+            logger.warning(
+                "OpenSky credentials are only partially configured. "
+                "Provide both OPENSKY_USERNAME and OPENSKY_PASSWORD or leave both unset."
+            )
+        elif not opensky_username:
+            logger.info(
+                "OpenSky evaluation mode is enabled without credentials. "
+                "Anonymous rate limits will apply."
+            )
+
+    if provider == "commercial_stub":
+        logger.info(
+            "Commercial provider mode selected with placeholder adapter. "
+            "Supply real vendor configuration before live evaluation."
+        )
 
     cors_origins = _get_csv("CORS_ORIGINS", DEFAULT_LOCAL_CORS_ORIGINS)
     if app_env == "production" and cors_origins == DEFAULT_LOCAL_CORS_ORIGINS:
@@ -167,8 +199,8 @@ def _load_settings() -> Settings:
         commercial_provider_name=_get_optional_str("COMMERCIAL_PROVIDER_NAME"),
         commercial_api_base_url=_get_optional_str("COMMERCIAL_API_BASE_URL"),
         commercial_api_key=_get_optional_str("COMMERCIAL_API_KEY"),
-        opensky_username=_get_optional_str("OPENSKY_USERNAME"),
-        opensky_password=_get_optional_str("OPENSKY_PASSWORD"),
+        opensky_username=opensky_username,
+        opensky_password=opensky_password,
         broadcast_interval=_get_float("BROADCAST_INTERVAL", 5.0, minimum=0.25),
         camera_fetch_interval=_get_float("CAMERA_FETCH_INTERVAL", 60.0, minimum=5.0),
         gemini_api_key=_get_optional_str("GEMINI_API_KEY"),

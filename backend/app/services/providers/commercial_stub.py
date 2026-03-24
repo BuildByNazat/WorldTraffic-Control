@@ -26,11 +26,11 @@ class CommercialProviderStub(BaseAircraftProvider):
             provider_status=AviationProviderStatus(
                 provider_key=self.provider_key,
                 provider_label=self._provider_name,
-                mode="provider",
+                mode="commercial",
                 checked_at=now,
                 healthy=False,
                 degraded=True,
-                message="No commercial aviation provider is configured yet.",
+                message="Commercial provider mode is configured, but no live vendor adapter is active yet.",
                 last_snapshot_at=None,
             ),
             generated_at=now,

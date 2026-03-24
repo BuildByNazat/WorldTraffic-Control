@@ -52,7 +52,7 @@ class OpenSkyProvider(BaseAircraftProvider):
                     provider_status=AviationProviderStatus(
                         provider_key=self.provider_key,
                         provider_label=self.provider_label,
-                        mode="provider",
+                        mode="evaluation",
                         checked_at=checked_at,
                         healthy=True,
                         degraded=False,
@@ -93,7 +93,7 @@ class OpenSkyProvider(BaseAircraftProvider):
                 provider_status=AviationProviderStatus(
                     provider_key=self.provider_key,
                     provider_label=self.provider_label,
-                    mode="provider",
+                    mode="evaluation",
                     checked_at=checked_at,
                     healthy=True,
                     degraded=False,
@@ -113,7 +113,7 @@ class OpenSkyProvider(BaseAircraftProvider):
                 AviationProviderStatus(
                     provider_key=self.provider_key,
                     provider_label=self.provider_label,
-                    mode="provider",
+                    mode="evaluation",
                     checked_at=checked_at,
                     healthy=False,
                     degraded=True,

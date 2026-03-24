@@ -33,7 +33,7 @@ npm run dev
 3. Open `http://localhost:5173`
 
 Demo-safe defaults:
-- aircraft use the built-in simulated provider unless `AIRCRAFT_PROVIDER=opensky`
+- aircraft use the built-in simulated provider unless `AVIATION_PROVIDER=opensky`
 - camera vision stays optional unless `GEMINI_API_KEY` is configured
 - the dashboard remains usable even with no detections or no promoted incidents
 
@@ -97,20 +97,36 @@ The Vite dev server proxies `/api` and `/ws` to the backend, so `localhost` fron
 
 Configured in `backend/.env` or project-root `.env`.
 
-- `AIRCRAFT_PROVIDER`
+- `AVIATION_DATA_MODE`
+  - Optional
+  - Default: `demo`
+  - Valid: `demo`, `evaluation`, `commercial`
+  - `provider` is still accepted as a legacy alias and is normalized automatically
+- `AVIATION_PROVIDER`
   - Optional
   - Default: `simulated`
-  - Valid: `simulated`, `opensky`
+  - Valid: `simulated`, `opensky`, `commercial_stub`
+- `AIRCRAFT_PROVIDER`
+  - Optional legacy alias for `AVIATION_PROVIDER`
 - `APP_ENV`
   - Optional
   - Default: `development`
   - Valid: `development`, `production`
 - `OPENSKY_USERNAME`
   - Optional
-  - Used when `AIRCRAFT_PROVIDER=opensky`
+  - Used when `AVIATION_PROVIDER=opensky`
 - `OPENSKY_PASSWORD`
   - Optional
-  - Used when `AIRCRAFT_PROVIDER=opensky`
+  - Used when `AVIATION_PROVIDER=opensky`
+- `COMMERCIAL_PROVIDER_NAME`
+  - Optional
+  - Placeholder label for future vendor evaluation handoff
+- `COMMERCIAL_API_BASE_URL`
+  - Optional
+  - Reserved for a future commercial adapter
+- `COMMERCIAL_API_KEY`
+  - Optional
+  - Reserved for a future commercial adapter
 - `BROADCAST_INTERVAL`
   - Optional
   - Default: `5.0`
@@ -206,10 +222,23 @@ Recommended production pattern:
 - expose health endpoints at `/healthz` and `/readyz`
 - keep the same-origin frontend/API model where practical
 
+## Aviation provider modes
+
+- `demo`
+  - Use `AVIATION_PROVIDER=simulated`
+  - Best for local UI work, demos, and safe fallbacks
+- `evaluation`
+  - Use `AVIATION_PROVIDER=opensky`
+  - Intended for real-provider testing and credential handoff
+  - Works anonymously or with real OpenSky credentials
+- `commercial`
+  - Use `AVIATION_PROVIDER=commercial_stub`
+  - Keeps the integration boundary ready for a licensed provider without pretending one is finalized
+
 ## Recommended demo setup
 
 For the most reliable public demo:
-- keep `AIRCRAFT_PROVIDER=simulated` unless you specifically want live OpenSky data
+- keep `AVIATION_PROVIDER=simulated` unless you specifically want live OpenSky evaluation data
 - leave `GEMINI_API_KEY` unset unless you have a stable camera image source ready
 - start in Live mode to show the map, overlays, alerts rail, and polished shell
 - switch to History mode to show replay, analytics, filters, incidents, and export
@@ -224,7 +253,8 @@ For a first real public deployment:
 - set `PUBLIC_BASE_URL` to the public HTTPS URL
 - replace default localhost `CORS_ORIGINS` with the real public frontend origin if you are serving frontend and backend separately
 - persist `DB_PATH` on durable storage; SQLite is acceptable for a single-node first deployment but not for multi-instance write-heavy scaling
-- keep `AIRCRAFT_PROVIDER=simulated` until OpenSky credentials and upstream reliability are ready for public use
+- keep `AVIATION_PROVIDER=simulated` until OpenSky credentials and upstream reliability are ready for public use
+- when you are ready to evaluate real aviation data, switch to `AVIATION_DATA_MODE=evaluation` and `AVIATION_PROVIDER=opensky`
 - leave `GEMINI_API_KEY` unset if camera analysis is not part of the launch plan; the UI will present this clearly instead of failing
 
 ## What still needs replacement before a true commercial launch

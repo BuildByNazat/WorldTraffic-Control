@@ -5,6 +5,14 @@ export interface ServiceStatusResponse {
   status: "ok";
   app_env: "development" | "production" | string;
   aircraft_provider: string;
+  aviation_data_mode: string;
+  aviation_provider: string;
+  aviation_provider_label: string;
+  aviation_active_source: string;
+  aviation_provider_healthy: boolean;
+  aviation_provider_degraded: boolean;
+  aviation_provider_message: string | null;
+  aviation_last_snapshot_at: string | null;
   simulated_mode: boolean;
   opensky_configured: boolean;
   broadcast_interval_seconds: number;

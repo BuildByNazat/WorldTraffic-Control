@@ -52,13 +52,35 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
   serviceStatusLoading = false,
   serviceStatusError = null,
 }) => {
-  const providerLabel = serviceStatus?.simulated_mode
-    ? "Simulated feed"
-    : serviceStatus?.aircraft_provider === "opensky"
-      ? serviceStatus.opensky_configured
-        ? "OpenSky live feed"
-        : "OpenSky live feed (anonymous)"
-      : "Live feed";
+  const modeLabel =
+    serviceStatus?.aviation_data_mode === "commercial"
+      ? "Commercial prep"
+      : serviceStatus?.aviation_data_mode === "evaluation"
+        ? "Evaluation"
+        : "Demo";
+  const providerLabel = serviceStatus?.aviation_provider_label
+    ? serviceStatus.aviation_provider === "opensky" && !serviceStatus.opensky_configured
+      ? `${serviceStatus.aviation_provider_label} (anonymous)`
+      : serviceStatus.aviation_provider_label
+    : serviceStatus?.simulated_mode
+      ? "Simulated feed"
+      : "Provider unavailable";
+  const sourceLabel =
+    serviceStatus?.aviation_active_source === "simulated" &&
+    serviceStatus.aviation_provider !== "simulated"
+      ? "Simulated fallback"
+      : serviceStatus?.aviation_active_source === "opensky"
+        ? "OpenSky evaluation"
+        : serviceStatus?.aviation_active_source === "commercial_stub"
+          ? "Commercial placeholder"
+          : "Simulated demo";
+  const providerHealthLabel = !serviceStatus
+    ? "Checking"
+    : serviceStatus.aviation_provider_healthy
+      ? serviceStatus.aviation_provider_degraded
+        ? "Degraded"
+        : "Healthy"
+      : "Unavailable";
 
   const visionLabel = serviceStatus?.gemini_enabled ? "Enabled" : "Optional / off";
   const environmentLabel =
@@ -71,7 +93,14 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
         : !serviceStatus
           ? "Loading provider and system readiness details."
       : serviceStatus?.simulated_mode
-        ? "Running on the built-in simulated aircraft feed. Configure OpenSky when you want public live traffic."
+        ? "Running on the built-in simulated aviation feed. Switch to evaluation mode when real provider credentials are ready."
+        : serviceStatus?.aviation_provider_degraded
+          ? serviceStatus.aviation_provider_message ??
+            "The configured aviation provider degraded and the app is using a safe fallback path."
+        : serviceStatus?.aviation_provider === "opensky" && !serviceStatus.opensky_configured
+          ? "OpenSky evaluation is running anonymously. Add both OpenSky credentials when you are ready to test a real handoff."
+        : serviceStatus?.aviation_provider === "commercial_stub"
+          ? "Commercial mode is only a readiness placeholder until a real licensed provider is chosen and configured."
         : !serviceStatus?.gemini_enabled
           ? "Camera vision is currently optional and not configured. Aircraft, alerts, and history remain available."
           : "Live tracking is healthy. Review history, alerts, and incidents from the side panels.";
@@ -108,8 +137,23 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
       <hr className="status-panel__divider" />
 
       <div className="status-panel__row">
+        <span className="status-panel__label">Mode</span>
+        <span className="status-panel__value">{modeLabel}</span>
+      </div>
+
+      <div className="status-panel__row">
         <span className="status-panel__label">Provider</span>
         <span className="status-panel__value">{providerLabel}</span>
+      </div>
+
+      <div className="status-panel__row">
+        <span className="status-panel__label">Source</span>
+        <span className="status-panel__value">{sourceLabel}</span>
+      </div>
+
+      <div className="status-panel__row">
+        <span className="status-panel__label">Health</span>
+        <span className="status-panel__value">{providerHealthLabel}</span>
       </div>
 
       <div className="status-panel__row">
