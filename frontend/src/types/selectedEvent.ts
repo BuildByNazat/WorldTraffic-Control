@@ -43,6 +43,9 @@ export interface SelectedAircraftDetail extends SelectedEventBase {
   routeDestination?: string | null;
   freshnessSeconds?: number | null;
   stale?: boolean;
+  currentlyVisible?: boolean;
+  availabilityNote?: string | null;
+  watchlistSavedAt?: string | null;
 }
 
 export interface SelectedIncidentDetail extends SelectedEventBase {

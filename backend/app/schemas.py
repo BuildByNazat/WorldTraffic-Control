@@ -49,6 +49,66 @@ class AircraftSearchResponse(BaseModel):
     results: List[AircraftSearchResult]
 
 
+class AuthCredentialsRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UserProfile(BaseModel):
+    id: int
+    email: str
+    created_at: datetime
+
+    model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
+
+
+class AuthSessionResponse(BaseModel):
+    authenticated: bool
+    user: Optional[UserProfile] = None
+    token: Optional[str] = None
+
+
+class WatchlistEntryRequest(BaseModel):
+    aircraft_id: str
+    callsign: Optional[str] = None
+    flight_identifier: Optional[str] = None
+    source: str
+    provider_name: Optional[str] = None
+    route_origin: Optional[str] = None
+    route_destination: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    altitude: Optional[float] = None
+    speed: Optional[float] = None
+    heading: Optional[float] = None
+    observed_at: Optional[datetime] = None
+
+
+class WatchlistEntryRecord(BaseModel):
+    id: int
+    aircraft_id: str
+    callsign: Optional[str] = None
+    flight_identifier: Optional[str] = None
+    source: str
+    provider_name: Optional[str] = None
+    route_origin: Optional[str] = None
+    route_destination: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    altitude: Optional[float] = None
+    speed: Optional[float] = None
+    heading: Optional[float] = None
+    observed_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
+
+
+class WatchlistResponse(BaseModel):
+    count: int
+    items: List[WatchlistEntryRecord]
+
+
 class AircraftGeometry(BaseModel):
     type: Literal["Point"] = "Point"
     coordinates: List[float] = Field(..., min_length=2, max_length=3)

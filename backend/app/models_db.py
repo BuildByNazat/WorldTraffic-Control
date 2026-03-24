@@ -7,12 +7,15 @@ Tables:
   camera_snapshots      - one row per camera reachability check cycle
   alert_states          - persisted operator status for derived alerts
   incidents             - lightweight operator incident records
+  user_accounts         - MVP user authentication records
+  user_sessions         - bearer-token backed login sessions
+  watchlist_entries     - saved aircraft tied to a user account
 """
 
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, Float, Integer, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -84,3 +87,44 @@ class IncidentCase(Base):
     camera_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     operator_notes: Mapped[str] = mapped_column(Text, default="")
     related_feature_ids: Mapped[str] = mapped_column(Text, default="[]")
+
+
+class UserAccount(Base):
+    __tablename__ = "user_accounts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(512))
+    created_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+
+
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user_accounts.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+
+
+class WatchlistEntry(Base):
+    __tablename__ = "watchlist_entries"
+    __table_args__ = (UniqueConstraint("user_id", "aircraft_id", name="uq_watchlist_user_aircraft"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user_accounts.id", ondelete="CASCADE"), index=True)
+    aircraft_id: Mapped[str] = mapped_column(String(64), index=True)
+    callsign: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    flight_identifier: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    source: Mapped[str] = mapped_column(String(64), index=True)
+    provider_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    route_origin: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    route_destination: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    altitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    heading: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    observed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, index=True)

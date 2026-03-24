@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -20,6 +20,8 @@ from app.schemas import (
     AircraftSearchResponse,
     AircraftSearchResult,
     AlertStatusResponse,
+    AuthCredentialsRequest,
+    AuthSessionResponse,
     AlertsResponse,
     AlertsSummary,
     CameraList,
@@ -32,6 +34,9 @@ from app.schemas import (
     IncidentStatusUpdateRequest,
     IncidentsResponse,
     ServiceStatus,
+    UserProfile,
+    WatchlistEntryRequest,
+    WatchlistResponse,
 )
 from app.services.analytics import get_analytics_overview, get_analytics_timeseries
 from app.services.alerts import derive_alert_records, get_alerts_summary
@@ -47,6 +52,25 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+
+def _validate_credentials(email: str, password: str) -> None:
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="Enter a valid email address.")
+    if len(password) < 8:
+        raise HTTPException(
+            status_code=400,
+            detail="Password must be at least 8 characters.",
+        )
+
+
+def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
+    if not authorization:
+        return None
+    scheme, _, value = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not value.strip():
+        return None
+    return value.strip()
 
 
 def _normalized_aircraft_tokens(
@@ -88,6 +112,27 @@ def _aircraft_match_score(
     if any(query in token for token in tokens):
         return 200
     return -1
+
+
+async def get_current_user(
+    authorization: Optional[str] = Header(default=None),
+) -> UserProfile:
+    from app.repositories.auth_repo import get_user_for_token
+
+    token = _extract_bearer_token(authorization)
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    user = await get_user_for_token(token)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Session is invalid or expired.")
+    return user
+
+
+async def get_optional_token(
+    authorization: Optional[str] = Header(default=None),
+) -> Optional[str]:
+    return _extract_bearer_token(authorization)
 
 
 @asynccontextmanager
@@ -279,6 +324,104 @@ async def aviation_search(
     )
     results = [result for _, result in ranked[:limit]]
     return AircraftSearchResponse(query=q.strip(), count=len(results), results=results)
+
+
+@app.post("/api/auth/signup", tags=["auth"], response_model=AuthSessionResponse)
+async def auth_signup(payload: AuthCredentialsRequest):
+    from sqlalchemy.exc import IntegrityError
+
+    from app.repositories.auth_repo import create_session_for_user, create_user, get_user_by_email
+
+    email = payload.email.strip().lower()
+    _validate_credentials(email, payload.password)
+
+    existing_user = await get_user_by_email(email)
+    if existing_user is not None:
+        raise HTTPException(status_code=409, detail="An account with that email already exists.")
+
+    try:
+        user = await create_user(email, payload.password)
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=409, detail="An account with that email already exists."
+        ) from exc
+
+    token = await create_session_for_user(user.id)
+    return AuthSessionResponse(authenticated=True, user=user, token=token)
+
+
+@app.post("/api/auth/signin", tags=["auth"], response_model=AuthSessionResponse)
+async def auth_signin(payload: AuthCredentialsRequest):
+    from app.repositories.auth_repo import create_session_for_user, get_user_by_email, verify_password
+
+    email = payload.email.strip().lower()
+    _validate_credentials(email, payload.password)
+
+    user_row = await get_user_by_email(email)
+    if user_row is None or not verify_password(payload.password, user_row.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+    user = UserProfile(id=user_row.id, email=user_row.email, created_at=user_row.created_at)
+    token = await create_session_for_user(user.id)
+    return AuthSessionResponse(authenticated=True, user=user, token=token)
+
+
+@app.post("/api/auth/signout", tags=["auth"], response_model=AuthSessionResponse)
+async def auth_signout(token: Optional[str] = Depends(get_optional_token)):
+    from app.repositories.auth_repo import delete_session
+
+    if token:
+        await delete_session(token)
+    return AuthSessionResponse(authenticated=False, user=None, token=None)
+
+
+@app.get("/api/auth/me", tags=["auth"], response_model=AuthSessionResponse)
+async def auth_me(token: Optional[str] = Depends(get_optional_token)):
+    from app.repositories.auth_repo import get_user_for_token
+
+    if not token:
+        return AuthSessionResponse(authenticated=False, user=None, token=None)
+
+    user = await get_user_for_token(token)
+    if user is None:
+        return AuthSessionResponse(authenticated=False, user=None, token=None)
+    return AuthSessionResponse(authenticated=True, user=user, token=None)
+
+
+@app.get("/api/watchlist", tags=["watchlist"], response_model=WatchlistResponse)
+async def watchlist_list(current_user: UserProfile = Depends(get_current_user)):
+    from app.repositories.watchlist_repo import list_watchlist_entries
+
+    items = await list_watchlist_entries(current_user.id)
+    return WatchlistResponse(count=len(items), items=items)
+
+
+@app.post("/api/watchlist", tags=["watchlist"], response_model=WatchlistResponse)
+async def watchlist_add(
+    payload: WatchlistEntryRequest, current_user: UserProfile = Depends(get_current_user)
+):
+    from app.repositories.watchlist_repo import list_watchlist_entries, upsert_watchlist_entry
+
+    if not payload.aircraft_id.strip():
+        raise HTTPException(status_code=400, detail="Aircraft id is required.")
+
+    await upsert_watchlist_entry(current_user.id, payload)
+    items = await list_watchlist_entries(current_user.id)
+    return WatchlistResponse(count=len(items), items=items)
+
+
+@app.delete("/api/watchlist/{aircraft_id}", tags=["watchlist"], response_model=WatchlistResponse)
+async def watchlist_remove(
+    aircraft_id: str, current_user: UserProfile = Depends(get_current_user)
+):
+    from app.repositories.watchlist_repo import list_watchlist_entries, remove_watchlist_entry
+
+    removed = await remove_watchlist_entry(current_user.id, aircraft_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Watchlist entry not found.")
+
+    items = await list_watchlist_entries(current_user.id)
+    return WatchlistResponse(count=len(items), items=items)
 
 
 @app.get("/api/cameras", tags=["cameras"], response_model=CameraList)

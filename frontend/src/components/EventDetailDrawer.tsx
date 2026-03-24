@@ -8,6 +8,11 @@ interface EventDetailDrawerProps {
   linkedIncident: IncidentRecord | null;
   onCreateIncidentFromAlert: () => void;
   onOpenLinkedIncident: () => void;
+  isAuthenticated: boolean;
+  watchlistedAircraftIds: string[];
+  watchlistBusy?: boolean;
+  watchlistMessage?: string | null;
+  onToggleAircraftWatchlist: (aircraft: Extract<SelectedEventDetail, { kind: "aircraft" }>) => void;
 }
 
 function formatTime(value: string): string {
@@ -59,10 +64,19 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
   linkedIncident,
   onCreateIncidentFromAlert,
   onOpenLinkedIncident,
+  isAuthenticated,
+  watchlistedAircraftIds,
+  watchlistBusy = false,
+  watchlistMessage = null,
+  onToggleAircraftWatchlist,
 }) => {
   if (!selectedEvent) {
     return null;
   }
+
+  const isWatchlisted =
+    selectedEvent.kind === "aircraft" &&
+    watchlistedAircraftIds.includes(selectedEvent.id);
 
   return (
     <aside className="event-detail" aria-label="Event details">
@@ -187,6 +201,14 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
               value={selectedEvent.providerName ?? selectedEvent.source}
             />
             <DetailRow
+              label="Visibility"
+              value={
+                selectedEvent.currentlyVisible === false
+                  ? selectedEvent.availabilityNote ?? "Not currently visible in the active provider snapshot"
+                  : "Currently visible"
+              }
+            />
+            <DetailRow
               label="Freshness"
               value={
                 selectedEvent.stale
@@ -206,6 +228,22 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
               }
             />
             <DetailRow label="Aircraft ID" value={selectedEvent.id} />
+            {watchlistMessage && (
+              <div className="event-detail__note">{watchlistMessage}</div>
+            )}
+            <div className="event-detail__actions event-detail__actions--split">
+              <button
+                type="button"
+                className="event-detail__action"
+                onClick={() => onToggleAircraftWatchlist(selectedEvent)}
+                disabled={!isAuthenticated || watchlistBusy}
+              >
+                {isWatchlisted ? "Remove from watchlist" : "Save to watchlist"}
+              </button>
+              {!isAuthenticated && (
+                <span className="event-detail__helper">Sign in to save aircraft</span>
+              )}
+            </div>
           </>
         )}
 

@@ -16,6 +16,7 @@ import AlertsPanel from "./components/AlertsPanel";
 import EventDetailDrawer from "./components/EventDetailDrawer";
 import IncidentsPanel from "./components/IncidentsPanel";
 import LayerControls from "./components/LayerControls";
+import WatchlistPanel from "./components/WatchlistPanel";
 import {
   useLiveFeed,
   isAircraftFeature,
@@ -28,10 +29,12 @@ import {
   type AircraftSearchResult,
 } from "./hooks/useAircraftSearch";
 import { useAlerts, type AlertRecord } from "./hooks/useAlerts";
+import { useAuth } from "./hooks/useAuth";
 import { useIncidents, type IncidentRecord } from "./hooks/useIncidents";
 import { useMapLayers } from "./hooks/useMapLayers";
 import { useServiceStatus } from "./hooks/useServiceStatus";
 import { useTheme } from "./hooks/useTheme";
+import { useWatchlist, type WatchlistItem } from "./hooks/useWatchlist";
 import type {
   SelectedAircraftDetail,
   SelectedAlertDetail,
@@ -39,10 +42,11 @@ import type {
   SelectedIncidentDetail,
 } from "./types/selectedEvent";
 
-type RailPanel = "operations" | "alerts" | "incidents" | "layers";
+type RailPanel = "operations" | "watchlist" | "alerts" | "incidents" | "layers";
 
 const PANEL_LABELS: Record<RailPanel, string> = {
   operations: "Operations",
+  watchlist: "Watchlist",
   alerts: "Alerts",
   incidents: "Incidents",
   layers: "Layers",
@@ -50,6 +54,7 @@ const PANEL_LABELS: Record<RailPanel, string> = {
 
 const RAIL_ICONS: Record<RailPanel, string> = {
   operations: "OP",
+  watchlist: "WL",
   alerts: "AL",
   incidents: "IN",
   layers: "LY",
@@ -80,6 +85,9 @@ function buildAircraftSelectionFromFeature(feature: AircraftFeature): SelectedAi
     routeDestination: feature.properties.route_destination ?? null,
     freshnessSeconds: feature.properties.freshness_seconds ?? null,
     stale: feature.properties.stale ?? false,
+    currentlyVisible: true,
+    availabilityNote: null,
+    watchlistSavedAt: null,
   };
 }
 
@@ -106,6 +114,46 @@ function buildAircraftSelectionFromSearchResult(
     routeDestination: result.route_destination,
     freshnessSeconds: result.freshness_seconds,
     stale: result.stale,
+    currentlyVisible: true,
+    availabilityNote: null,
+    watchlistSavedAt: null,
+  };
+}
+
+function buildAircraftSelectionFromWatchlistItem(
+  item: WatchlistItem,
+  liveFeature?: AircraftFeature
+): SelectedAircraftDetail {
+  if (liveFeature) {
+    return {
+      ...buildAircraftSelectionFromFeature(liveFeature),
+      watchlistSavedAt: item.created_at,
+    };
+  }
+
+  return {
+    kind: "aircraft",
+    id: item.aircraft_id,
+    label: item.callsign ?? item.flight_identifier ?? item.aircraft_id,
+    timestamp: item.observed_at ?? "",
+    latitude: item.latitude ?? 0,
+    longitude: item.longitude ?? 0,
+    source: item.source,
+    cameraId: null,
+    featureIds: [item.aircraft_id],
+    callsign: item.callsign,
+    flightIdentifier: item.flight_identifier ?? item.callsign ?? null,
+    altitude: item.altitude,
+    speed: item.speed,
+    heading: item.heading,
+    providerName: item.provider_name,
+    routeOrigin: item.route_origin,
+    routeDestination: item.route_destination,
+    freshnessSeconds: null,
+    stale: false,
+    currentlyVisible: false,
+    availabilityNote: "Not currently visible in the active provider snapshot",
+    watchlistSavedAt: item.created_at,
   };
 }
 
@@ -133,14 +181,21 @@ const App: React.FC = () => {
   const [isReplayPlaying, setIsReplayPlaying] = useState(false);
   const [aircraftQuery, setAircraftQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [watchlistFeedback, setWatchlistFeedback] = useState<string | null>(null);
 
   const historyFilters = useFilteredHistory();
   const historyFeed = useHistoryFeed(mode === "history", historyFilters.filters);
   const aircraftSearch = useAircraftSearch(aircraftQuery, mode === "live");
   const alertsState = useAlerts(true);
+  const authState = useAuth();
   const incidentsState = useIncidents(true);
   const mapLayers = useMapLayers();
   const serviceStatusState = useServiceStatus(true);
+  const watchlistState = useWatchlist(authState.token);
 
   const aircraftCount = data?.features.filter(isAircraftFeature).length ?? 0;
   const detectionCount =
@@ -179,6 +234,16 @@ const App: React.FC = () => {
       setHistoryOpen(false);
     }
   }, [mode]);
+
+  useEffect(() => {
+    if (!authState.isAuthenticated) {
+      setActiveDrawer((current) => (current === "watchlist" ? null : current));
+    }
+  }, [authState.isAuthenticated]);
+
+  useEffect(() => {
+    setWatchlistFeedback(watchlistState.error);
+  }, [watchlistState.error]);
 
   useEffect(() => {
     if (selectedEvent?.kind !== "incident") return;
@@ -293,6 +358,21 @@ const App: React.FC = () => {
     selectAircraft(buildAircraftSelectionFromSearchResult(result), false);
   }
 
+  function handleSelectWatchlistItem(item: WatchlistItem) {
+    const liveFeature = data?.features.find(
+      (feature): feature is AircraftFeature =>
+        isAircraftFeature(feature) && feature.properties.id === item.aircraft_id
+    );
+    setActiveDrawer("watchlist");
+    const detail = buildAircraftSelectionFromWatchlistItem(item, liveFeature);
+    if (!liveFeature && (item.latitude == null || item.longitude == null)) {
+      setSelectedEvent(detail);
+      setHighlight(null);
+      return;
+    }
+    selectAircraft(detail, false);
+  }
+
   function toggleDrawer(panel: RailPanel) {
     setActiveDrawer((current) => {
       if (current === panel) return null;
@@ -366,6 +446,33 @@ const App: React.FC = () => {
     }
   }
 
+  async function handleAuthSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const action = authMode === "signup" ? authState.signUp : authState.signIn;
+    const success = await action(authEmail, authPassword);
+    if (success) {
+      setAccountOpen(false);
+      setAuthPassword("");
+      setWatchlistFeedback(null);
+    }
+  }
+
+  async function handleToggleAircraftWatchlist(aircraft: SelectedAircraftDetail) {
+    try {
+      if (watchlistState.items.some((item) => item.aircraft_id === aircraft.id)) {
+        await watchlistState.removeAircraft(aircraft.id);
+        setWatchlistFeedback("Aircraft removed from watchlist.");
+      } else {
+        await watchlistState.addAircraft(aircraft);
+        setWatchlistFeedback("Aircraft saved to watchlist.");
+      }
+    } catch (error) {
+      setWatchlistFeedback(
+        error instanceof Error ? error.message : "Unable to update watchlist."
+      );
+    }
+  }
+
   const isLeftDrawer = activeDrawer !== null;
   const isRightDrawer = historyOpen;
   const hideEventDetail = isReplayPlaying;
@@ -393,6 +500,97 @@ const App: React.FC = () => {
         <div className="app-header__spacer" />
 
         <div className="app-header__controls">
+          <div className="account-menu">
+            <button
+              type="button"
+              className="app-header__button"
+              onClick={() => setAccountOpen((current) => !current)}
+            >
+              {authState.isAuthenticated ? authState.user?.email ?? "Account" : "Account"}
+            </button>
+            {accountOpen && (
+              <div className="account-menu__panel">
+                {authState.isAuthenticated ? (
+                  <div className="account-menu__summary">
+                    <span className="account-menu__title">Signed in</span>
+                    <span className="account-menu__meta">
+                      {authState.user?.email ?? "Active account"}
+                    </span>
+                    <button
+                      type="button"
+                      className="account-menu__action"
+                      onClick={() => {
+                        void authState.signOut();
+                        setAccountOpen(false);
+                      }}
+                      disabled={authState.submitting}
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                ) : (
+                  <form className="account-menu__form" onSubmit={handleAuthSubmit}>
+                    <div className="account-menu__tabs">
+                      <button
+                        type="button"
+                        className={`account-menu__tab${
+                          authMode === "signin" ? " account-menu__tab--active" : ""
+                        }`}
+                        onClick={() => setAuthMode("signin")}
+                      >
+                        Sign in
+                      </button>
+                      <button
+                        type="button"
+                        className={`account-menu__tab${
+                          authMode === "signup" ? " account-menu__tab--active" : ""
+                        }`}
+                        onClick={() => setAuthMode("signup")}
+                      >
+                        Sign up
+                      </button>
+                    </div>
+                    <label className="account-menu__field">
+                      <span>Email</span>
+                      <input
+                        type="email"
+                        value={authEmail}
+                        onChange={(event) => setAuthEmail(event.target.value)}
+                        autoComplete="email"
+                        required
+                      />
+                    </label>
+                    <label className="account-menu__field">
+                      <span>Password</span>
+                      <input
+                        type="password"
+                        value={authPassword}
+                        onChange={(event) => setAuthPassword(event.target.value)}
+                        autoComplete={
+                          authMode === "signup" ? "new-password" : "current-password"
+                        }
+                        required
+                      />
+                    </label>
+                    {authState.error && (
+                      <div className="account-menu__error">{authState.error}</div>
+                    )}
+                    <button
+                      type="submit"
+                      className="account-menu__action"
+                      disabled={authState.submitting || authState.loading}
+                    >
+                      {authState.submitting
+                        ? "Working..."
+                        : authMode === "signup"
+                          ? "Create account"
+                          : "Sign in"}
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
+          </div>
           <button
             type="button"
             className="app-header__button"
@@ -491,7 +689,7 @@ const App: React.FC = () => {
         </div>
 
         <nav className="rail" aria-label="Tools">
-          {(["operations", "alerts", "incidents", "layers"] as RailPanel[]).map(
+          {(["operations", "watchlist", "alerts", "incidents", "layers"] as RailPanel[]).map(
             (panel) => (
               <button
                 key={panel}
@@ -507,6 +705,9 @@ const App: React.FC = () => {
                 )}
                 {panel === "incidents" && openIncidentsCount > 0 && (
                   <span className="rail__btn-badge">{openIncidentsCount}</span>
+                )}
+                {panel === "watchlist" && watchlistState.items.length > 0 && (
+                  <span className="rail__btn-badge">{watchlistState.items.length}</span>
                 )}
               </button>
             )
@@ -542,6 +743,31 @@ const App: React.FC = () => {
                   serviceStatus={serviceStatusState.status}
                   serviceStatusLoading={serviceStatusState.loading}
                   serviceStatusError={serviceStatusState.error}
+                />
+              )}
+              {activeDrawer === "watchlist" && (
+                <WatchlistPanel
+                  isAuthenticated={authState.isAuthenticated}
+                  userEmail={authState.user?.email ?? null}
+                  items={watchlistState.items}
+                  loading={watchlistState.loading}
+                  saving={watchlistState.saving}
+                  error={watchlistState.error}
+                  selectedAircraftId={
+                    selectedEvent?.kind === "aircraft" ? selectedEvent.id : null
+                  }
+                  onSelectItem={handleSelectWatchlistItem}
+                  onRemoveItem={(aircraftId) => {
+                    void watchlistState.removeAircraft(aircraftId)
+                      .then(() => setWatchlistFeedback("Aircraft removed from watchlist."))
+                      .catch((error) => {
+                        setWatchlistFeedback(
+                          error instanceof Error
+                            ? error.message
+                            : "Unable to remove aircraft."
+                        );
+                      });
+                  }}
                 />
               )}
               {activeDrawer === "alerts" && (
@@ -621,6 +847,13 @@ const App: React.FC = () => {
               if (linkedIncident) {
                 selectIncident(linkedIncident, false);
               }
+            }}
+            isAuthenticated={authState.isAuthenticated}
+            watchlistedAircraftIds={watchlistState.items.map((item) => item.aircraft_id)}
+            watchlistBusy={watchlistState.saving}
+            watchlistMessage={watchlistFeedback}
+            onToggleAircraftWatchlist={(aircraft) => {
+              void handleToggleAircraftWatchlist(aircraft);
             }}
           />
         )}
