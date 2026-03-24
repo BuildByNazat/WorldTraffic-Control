@@ -109,6 +109,52 @@ class WatchlistResponse(BaseModel):
     items: List[WatchlistEntryRecord]
 
 
+AircraftAlertType = Literal["visible", "not_visible", "movement"]
+AircraftAlertStatus = Literal["triggered", "waiting", "unavailable", "disabled"]
+
+
+class AircraftAlertRuleRequest(BaseModel):
+    aircraft_id: str
+    alert_type: AircraftAlertType
+    movement_nm_threshold: Optional[float] = Field(default=None, ge=5, le=500)
+
+
+class AircraftAlertRuleUpdateRequest(BaseModel):
+    enabled: bool
+
+
+class AircraftAlertRuleRecord(BaseModel):
+    id: int
+    aircraft_id: str
+    watchlist_entry_id: int
+    callsign: Optional[str] = None
+    flight_identifier: Optional[str] = None
+    source: str
+    provider_name: Optional[str] = None
+    alert_type: AircraftAlertType
+    enabled: bool
+    movement_nm_threshold: Optional[float] = None
+    baseline_latitude: Optional[float] = None
+    baseline_longitude: Optional[float] = None
+    baseline_observed_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+    status: AircraftAlertStatus
+    status_message: str
+    currently_visible: bool
+    current_latitude: Optional[float] = None
+    current_longitude: Optional[float] = None
+    current_observed_at: Optional[datetime] = None
+    distance_nm: Optional[float] = None
+
+    model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
+
+
+class AircraftAlertsResponse(BaseModel):
+    count: int
+    items: List[AircraftAlertRuleRecord]
+
+
 class AircraftGeometry(BaseModel):
     type: Literal["Point"] = "Point"
     coordinates: List[float] = Field(..., min_length=2, max_length=3)

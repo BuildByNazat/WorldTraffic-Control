@@ -4,6 +4,7 @@ WorldTraffic Control API entry point.
 
 import asyncio
 import logging
+import math
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
@@ -15,6 +16,10 @@ from app.config import settings
 from app.db import check_db_connection, close_db, init_db
 from app.schemas import (
     AnalyticsOverview,
+    AircraftAlertRuleRecord,
+    AircraftAlertRuleRequest,
+    AircraftAlertRuleUpdateRequest,
+    AircraftAlertsResponse,
     AnalyticsTimeseriesResponse,
     AircraftHistoryResponse,
     AircraftSearchResponse,
@@ -112,6 +117,94 @@ def _aircraft_match_score(
     if any(query in token for token in tokens):
         return 200
     return -1
+
+
+def _distance_nm(
+    latitude_a: float, longitude_a: float, latitude_b: float, longitude_b: float
+) -> float:
+    radius_nm = 3440.065
+    lat_a = math.radians(latitude_a)
+    lat_b = math.radians(latitude_b)
+    delta_lat = math.radians(latitude_b - latitude_a)
+    delta_lon = math.radians(longitude_b - longitude_a)
+
+    haversine = (
+        math.sin(delta_lat / 2) ** 2
+        + math.cos(lat_a) * math.cos(lat_b) * math.sin(delta_lon / 2) ** 2
+    )
+    return 2 * radius_nm * math.asin(math.sqrt(haversine))
+
+
+def _serialize_aircraft_alert_rule(
+    row,
+    current_flight,
+) -> AircraftAlertRuleRecord:
+    current_visible = current_flight is not None
+    distance_nm: Optional[float] = None
+
+    if not row.enabled:
+        status = "disabled"
+        message = "Rule disabled."
+    elif row.alert_type == "visible":
+        status = "triggered" if current_visible else "waiting"
+        message = (
+            "Aircraft is currently visible in the active provider snapshot."
+            if current_visible
+            else "Waiting for the aircraft to appear in the active provider snapshot."
+        )
+    elif row.alert_type == "not_visible":
+        status = "triggered" if not current_visible else "waiting"
+        message = (
+            "Aircraft is not currently visible in the active provider snapshot."
+            if not current_visible
+            else "Aircraft is still visible in the active provider snapshot."
+        )
+    else:
+        if not current_visible:
+            status = "unavailable"
+            message = "Movement alert is unavailable because the aircraft is not currently visible."
+        elif row.baseline_latitude is None or row.baseline_longitude is None:
+            status = "unavailable"
+            message = "Movement alert needs a saved position baseline from the watchlist entry."
+        else:
+            distance_nm = _distance_nm(
+                row.baseline_latitude,
+                row.baseline_longitude,
+                current_flight.latitude,
+                current_flight.longitude,
+            )
+            threshold = row.movement_nm_threshold or 25.0
+            status = "triggered" if distance_nm >= threshold else "waiting"
+            message = (
+                f"Aircraft moved {distance_nm:.1f} NM from the saved position."
+                if distance_nm >= threshold
+                else f"Waiting for {threshold:.0f} NM of movement from the saved position ({distance_nm:.1f} NM so far)."
+            )
+
+    return AircraftAlertRuleRecord(
+        id=row.id,
+        aircraft_id=row.aircraft_id,
+        watchlist_entry_id=row.watchlist_entry_id,
+        callsign=row.callsign,
+        flight_identifier=row.flight_identifier,
+        source=row.source,
+        provider_name=row.provider_name,
+        alert_type=row.alert_type,
+        enabled=row.enabled,
+        movement_nm_threshold=row.movement_nm_threshold,
+        baseline_latitude=row.baseline_latitude,
+        baseline_longitude=row.baseline_longitude,
+        baseline_observed_at=row.baseline_observed_at,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        status=status,
+        status_message=message,
+        currently_visible=current_visible,
+        current_latitude=current_flight.latitude if current_flight else None,
+        current_longitude=current_flight.longitude if current_flight else None,
+        current_observed_at=current_flight.observed_at if current_flight else None,
+        distance_nm=distance_nm,
+    )
 
 
 async def get_current_user(
@@ -422,6 +515,113 @@ async def watchlist_remove(
 
     items = await list_watchlist_entries(current_user.id)
     return WatchlistResponse(count=len(items), items=items)
+
+
+@app.get("/api/aircraft-alerts", tags=["watchlist"], response_model=AircraftAlertsResponse)
+async def aircraft_alerts_list(current_user: UserProfile = Depends(get_current_user)):
+    from app.repositories.aircraft_alert_repo import list_aircraft_alert_rules
+
+    snapshot = factory.last_snapshot or await factory.get_snapshot()
+    flights_by_id = {flight.stable_id: flight for flight in snapshot.flights}
+    rows = await list_aircraft_alert_rules(current_user.id)
+    items = [
+        _serialize_aircraft_alert_rule(row, flights_by_id.get(row.aircraft_id))
+        for row in rows
+    ]
+    return AircraftAlertsResponse(count=len(items), items=items)
+
+
+@app.post("/api/aircraft-alerts", tags=["watchlist"], response_model=AircraftAlertsResponse)
+async def aircraft_alerts_create(
+    payload: AircraftAlertRuleRequest,
+    current_user: UserProfile = Depends(get_current_user),
+):
+    from app.repositories.aircraft_alert_repo import create_aircraft_alert_rule, list_aircraft_alert_rules
+
+    movement_threshold = payload.movement_nm_threshold
+    if payload.alert_type == "movement" and movement_threshold is None:
+        movement_threshold = 25.0
+
+    created, created_new = await create_aircraft_alert_rule(
+        user_id=current_user.id,
+        aircraft_id=payload.aircraft_id.strip(),
+        alert_type=payload.alert_type,
+        movement_nm_threshold=movement_threshold,
+    )
+    if created is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Save the aircraft to your watchlist before creating alerts.",
+        )
+    if not created_new:
+        raise HTTPException(status_code=409, detail="Alert rule already exists.")
+
+    snapshot = factory.last_snapshot or await factory.get_snapshot()
+    flights_by_id = {flight.stable_id: flight for flight in snapshot.flights}
+    rows = await list_aircraft_alert_rules(current_user.id)
+    items = [
+        _serialize_aircraft_alert_rule(row, flights_by_id.get(row.aircraft_id))
+        for row in rows
+    ]
+    return AircraftAlertsResponse(count=len(items), items=items)
+
+
+@app.patch(
+    "/api/aircraft-alerts/{alert_id}",
+    tags=["watchlist"],
+    response_model=AircraftAlertsResponse,
+)
+async def aircraft_alerts_update(
+    alert_id: int,
+    payload: AircraftAlertRuleUpdateRequest,
+    current_user: UserProfile = Depends(get_current_user),
+):
+    from app.repositories.aircraft_alert_repo import (
+        list_aircraft_alert_rules,
+        update_aircraft_alert_rule_enabled,
+    )
+
+    updated = await update_aircraft_alert_rule_enabled(
+        current_user.id, alert_id, payload.enabled
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Aircraft alert rule not found.")
+
+    snapshot = factory.last_snapshot or await factory.get_snapshot()
+    flights_by_id = {flight.stable_id: flight for flight in snapshot.flights}
+    rows = await list_aircraft_alert_rules(current_user.id)
+    items = [
+        _serialize_aircraft_alert_rule(row, flights_by_id.get(row.aircraft_id))
+        for row in rows
+    ]
+    return AircraftAlertsResponse(count=len(items), items=items)
+
+
+@app.delete(
+    "/api/aircraft-alerts/{alert_id}",
+    tags=["watchlist"],
+    response_model=AircraftAlertsResponse,
+)
+async def aircraft_alerts_delete(
+    alert_id: int, current_user: UserProfile = Depends(get_current_user)
+):
+    from app.repositories.aircraft_alert_repo import (
+        delete_aircraft_alert_rule,
+        list_aircraft_alert_rules,
+    )
+
+    deleted = await delete_aircraft_alert_rule(current_user.id, alert_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Aircraft alert rule not found.")
+
+    snapshot = factory.last_snapshot or await factory.get_snapshot()
+    flights_by_id = {flight.stable_id: flight for flight in snapshot.flights}
+    rows = await list_aircraft_alert_rules(current_user.id)
+    items = [
+        _serialize_aircraft_alert_rule(row, flights_by_id.get(row.aircraft_id))
+        for row in rows
+    ]
+    return AircraftAlertsResponse(count=len(items), items=items)
 
 
 @app.get("/api/cameras", tags=["cameras"], response_model=CameraList)

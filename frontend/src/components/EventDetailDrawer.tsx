@@ -1,4 +1,8 @@
 import React from "react";
+import type {
+  AircraftAlertRule,
+  AircraftAlertType,
+} from "../hooks/useAircraftAlerts";
 import type { IncidentRecord } from "../hooks/useIncidents";
 import type { SelectedEventDetail } from "../types/selectedEvent";
 
@@ -13,6 +17,12 @@ interface EventDetailDrawerProps {
   watchlistBusy?: boolean;
   watchlistMessage?: string | null;
   onToggleAircraftWatchlist: (aircraft: Extract<SelectedEventDetail, { kind: "aircraft" }>) => void;
+  aircraftAlerts?: AircraftAlertRule[];
+  aircraftAlertsBusy?: boolean;
+  aircraftAlertsMessage?: string | null;
+  onCreateAircraftAlert: (aircraftId: string, alertType: AircraftAlertType) => void;
+  onToggleAircraftAlertEnabled: (alertId: number, enabled: boolean) => void;
+  onRemoveAircraftAlert: (alertId: number) => void;
 }
 
 function formatTime(value: string): string {
@@ -58,6 +68,12 @@ function DetailRow({
   );
 }
 
+function formatAlertLabel(alert: AircraftAlertRule): string {
+  if (alert.alert_type === "visible") return "Appears";
+  if (alert.alert_type === "not_visible") return "Missing";
+  return `Moves ${Math.round(alert.movement_nm_threshold ?? 25)} NM`;
+}
+
 const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
   selectedEvent,
   onClose,
@@ -69,6 +85,12 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
   watchlistBusy = false,
   watchlistMessage = null,
   onToggleAircraftWatchlist,
+  aircraftAlerts = [],
+  aircraftAlertsBusy = false,
+  aircraftAlertsMessage = null,
+  onCreateAircraftAlert,
+  onToggleAircraftAlertEnabled,
+  onRemoveAircraftAlert,
 }) => {
   if (!selectedEvent) {
     return null;
@@ -244,6 +266,95 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
                 <span className="event-detail__helper">Sign in to save aircraft</span>
               )}
             </div>
+            {isAuthenticated && isWatchlisted && (
+              <div className="event-detail__alert-section">
+                <div className="event-detail__alert-header">
+                  <span className="event-detail__alert-title">Aircraft alerts</span>
+                  <div className="event-detail__alert-actions">
+                    {!aircraftAlerts.some((alert) => alert.alert_type === "visible") && (
+                      <button
+                        type="button"
+                        className="event-detail__action"
+                        onClick={() => onCreateAircraftAlert(selectedEvent.id, "visible")}
+                        disabled={aircraftAlertsBusy}
+                      >
+                        Appears
+                      </button>
+                    )}
+                    {!aircraftAlerts.some(
+                      (alert) => alert.alert_type === "not_visible"
+                    ) && (
+                      <button
+                        type="button"
+                        className="event-detail__action"
+                        onClick={() => onCreateAircraftAlert(selectedEvent.id, "not_visible")}
+                        disabled={aircraftAlertsBusy}
+                      >
+                        Missing
+                      </button>
+                    )}
+                    {!aircraftAlerts.some((alert) => alert.alert_type === "movement") && (
+                      <button
+                        type="button"
+                        className="event-detail__action"
+                        onClick={() => onCreateAircraftAlert(selectedEvent.id, "movement")}
+                        disabled={aircraftAlertsBusy}
+                      >
+                        Move 25 NM
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {aircraftAlertsMessage && (
+                  <div className="event-detail__note">{aircraftAlertsMessage}</div>
+                )}
+                {aircraftAlerts.length === 0 && (
+                  <div className="event-detail__helper">
+                    No alert rules configured for this aircraft yet.
+                  </div>
+                )}
+                {aircraftAlerts.map((alert) => (
+                  <div key={alert.id} className="event-detail__alert-row">
+                    <div className="event-detail__alert-copy">
+                      <span className="event-detail__alert-rule">
+                        {formatAlertLabel(alert)}
+                      </span>
+                      <span className="event-detail__helper">{alert.status_message}</span>
+                    </div>
+                    <span
+                      className={`event-detail__alert-status event-detail__alert-status--${alert.status}`}
+                    >
+                      {alert.enabled ? alert.status : "disabled"}
+                    </span>
+                    <div className="event-detail__alert-row-actions">
+                      <button
+                        type="button"
+                        className="event-detail__action"
+                        onClick={() =>
+                          onToggleAircraftAlertEnabled(alert.id, !alert.enabled)
+                        }
+                        disabled={aircraftAlertsBusy}
+                      >
+                        {alert.enabled ? "Disable" : "Enable"}
+                      </button>
+                      <button
+                        type="button"
+                        className="event-detail__action"
+                        onClick={() => onRemoveAircraftAlert(alert.id)}
+                        disabled={aircraftAlertsBusy}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {isAuthenticated && !isWatchlisted && (
+              <div className="event-detail__helper">
+                Save this aircraft to your watchlist before creating aircraft alerts.
+              </div>
+            )}
           </>
         )}
 

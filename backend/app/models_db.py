@@ -10,12 +10,13 @@ Tables:
   user_accounts         - MVP user authentication records
   user_sessions         - bearer-token backed login sessions
   watchlist_entries     - saved aircraft tied to a user account
+  aircraft_alert_rules  - user-configured watchlist alert rules
 """
 
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -128,3 +129,38 @@ class WatchlistEntry(Base):
     heading: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     observed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+
+
+class AircraftAlertRule(Base):
+    __tablename__ = "aircraft_alert_rules"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "watchlist_entry_id",
+            "alert_type",
+            name="uq_aircraft_alert_user_watchlist_type",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user_accounts.id", ondelete="CASCADE"), index=True
+    )
+    watchlist_entry_id: Mapped[int] = mapped_column(
+        ForeignKey("watchlist_entries.id", ondelete="CASCADE"), index=True
+    )
+    aircraft_id: Mapped[str] = mapped_column(String(64), index=True)
+    callsign: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    flight_identifier: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    source: Mapped[str] = mapped_column(String(64), index=True)
+    provider_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    alert_type: Mapped[str] = mapped_column(String(24), index=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    movement_nm_threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    baseline_latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    baseline_longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    baseline_observed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, index=True)

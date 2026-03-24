@@ -30,6 +30,11 @@ import {
 } from "./hooks/useAircraftSearch";
 import { useAlerts, type AlertRecord } from "./hooks/useAlerts";
 import { useAuth } from "./hooks/useAuth";
+import {
+  useAircraftAlerts,
+  type AircraftAlertRule,
+  type AircraftAlertType,
+} from "./hooks/useAircraftAlerts";
 import { useIncidents, type IncidentRecord } from "./hooks/useIncidents";
 import { useMapLayers } from "./hooks/useMapLayers";
 import { useServiceStatus } from "./hooks/useServiceStatus";
@@ -186,12 +191,14 @@ const App: React.FC = () => {
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [watchlistFeedback, setWatchlistFeedback] = useState<string | null>(null);
+  const [aircraftAlertsFeedback, setAircraftAlertsFeedback] = useState<string | null>(null);
 
   const historyFilters = useFilteredHistory();
   const historyFeed = useHistoryFeed(mode === "history", historyFilters.filters);
   const aircraftSearch = useAircraftSearch(aircraftQuery, mode === "live");
   const alertsState = useAlerts(true);
   const authState = useAuth();
+  const aircraftAlertsState = useAircraftAlerts(authState.token);
   const incidentsState = useIncidents(true);
   const mapLayers = useMapLayers();
   const serviceStatusState = useServiceStatus(true);
@@ -226,6 +233,19 @@ const App: React.FC = () => {
     return null;
   }, [incidentsState, selectedEvent]);
 
+  const aircraftAlertsByAircraftId = useMemo(() => {
+    return aircraftAlertsState.items.reduce<Record<string, AircraftAlertRule[]>>(
+      (accumulator, alert) => {
+        if (!accumulator[alert.aircraft_id]) {
+          accumulator[alert.aircraft_id] = [];
+        }
+        accumulator[alert.aircraft_id].push(alert);
+        return accumulator;
+      },
+      {}
+    );
+  }, [aircraftAlertsState.items]);
+
   useEffect(() => {
     if (mode === "history") {
       setHistoryOpen(true);
@@ -244,6 +264,10 @@ const App: React.FC = () => {
   useEffect(() => {
     setWatchlistFeedback(watchlistState.error);
   }, [watchlistState.error]);
+
+  useEffect(() => {
+    setAircraftAlertsFeedback(aircraftAlertsState.error);
+  }, [aircraftAlertsState.error]);
 
   useEffect(() => {
     if (selectedEvent?.kind !== "incident") return;
@@ -461,6 +485,7 @@ const App: React.FC = () => {
     try {
       if (watchlistState.items.some((item) => item.aircraft_id === aircraft.id)) {
         await watchlistState.removeAircraft(aircraft.id);
+        await aircraftAlertsState.refresh();
         setWatchlistFeedback("Aircraft removed from watchlist.");
       } else {
         await watchlistState.addAircraft(aircraft);
@@ -469,6 +494,47 @@ const App: React.FC = () => {
     } catch (error) {
       setWatchlistFeedback(
         error instanceof Error ? error.message : "Unable to update watchlist."
+      );
+    }
+  }
+
+  async function handleCreateAircraftAlert(
+    aircraftId: string,
+    alertType: AircraftAlertType
+  ) {
+    try {
+      await aircraftAlertsState.createAlert(aircraftId, alertType);
+      setAircraftAlertsFeedback("Aircraft alert rule saved.");
+    } catch (error) {
+      setAircraftAlertsFeedback(
+        error instanceof Error ? error.message : "Unable to create aircraft alert."
+      );
+    }
+  }
+
+  async function handleToggleAircraftAlertEnabled(
+    alertId: number,
+    enabled: boolean
+  ) {
+    try {
+      await aircraftAlertsState.setAlertEnabled(alertId, enabled);
+      setAircraftAlertsFeedback(
+        enabled ? "Aircraft alert enabled." : "Aircraft alert disabled."
+      );
+    } catch (error) {
+      setAircraftAlertsFeedback(
+        error instanceof Error ? error.message : "Unable to update aircraft alert."
+      );
+    }
+  }
+
+  async function handleRemoveAircraftAlert(alertId: number) {
+    try {
+      await aircraftAlertsState.removeAlert(alertId);
+      setAircraftAlertsFeedback("Aircraft alert removed.");
+    } catch (error) {
+      setAircraftAlertsFeedback(
+        error instanceof Error ? error.message : "Unable to remove aircraft alert."
       );
     }
   }
@@ -753,13 +819,20 @@ const App: React.FC = () => {
                   loading={watchlistState.loading}
                   saving={watchlistState.saving}
                   error={watchlistState.error}
+                  alertsLoading={aircraftAlertsState.loading}
+                  alertsSaving={aircraftAlertsState.saving}
+                  alertsError={aircraftAlertsFeedback}
+                  alertsByAircraftId={aircraftAlertsByAircraftId}
                   selectedAircraftId={
                     selectedEvent?.kind === "aircraft" ? selectedEvent.id : null
                   }
                   onSelectItem={handleSelectWatchlistItem}
                   onRemoveItem={(aircraftId) => {
                     void watchlistState.removeAircraft(aircraftId)
-                      .then(() => setWatchlistFeedback("Aircraft removed from watchlist."))
+                      .then(async () => {
+                        await aircraftAlertsState.refresh();
+                        setWatchlistFeedback("Aircraft removed from watchlist.");
+                      })
                       .catch((error) => {
                         setWatchlistFeedback(
                           error instanceof Error
@@ -767,6 +840,15 @@ const App: React.FC = () => {
                             : "Unable to remove aircraft."
                         );
                       });
+                  }}
+                  onCreateAlert={(aircraftId, alertType) => {
+                    void handleCreateAircraftAlert(aircraftId, alertType);
+                  }}
+                  onToggleAlertEnabled={(alertId, enabled) => {
+                    void handleToggleAircraftAlertEnabled(alertId, enabled);
+                  }}
+                  onRemoveAlert={(alertId) => {
+                    void handleRemoveAircraftAlert(alertId);
                   }}
                 />
               )}
@@ -854,6 +936,22 @@ const App: React.FC = () => {
             watchlistMessage={watchlistFeedback}
             onToggleAircraftWatchlist={(aircraft) => {
               void handleToggleAircraftWatchlist(aircraft);
+            }}
+            aircraftAlerts={
+              selectedEvent?.kind === "aircraft"
+                ? aircraftAlertsByAircraftId[selectedEvent.id] ?? []
+                : []
+            }
+            aircraftAlertsBusy={aircraftAlertsState.saving}
+            aircraftAlertsMessage={aircraftAlertsFeedback}
+            onCreateAircraftAlert={(aircraftId, alertType) => {
+              void handleCreateAircraftAlert(aircraftId, alertType);
+            }}
+            onToggleAircraftAlertEnabled={(alertId, enabled) => {
+              void handleToggleAircraftAlertEnabled(alertId, enabled);
+            }}
+            onRemoveAircraftAlert={(alertId) => {
+              void handleRemoveAircraftAlert(alertId);
             }}
           />
         )}
