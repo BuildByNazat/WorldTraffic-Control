@@ -106,19 +106,19 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
           ? "Loading provider and system readiness details."
       : serviceStatus?.simulated_mode
         ? serviceStatus.aviation_provider === "simulated"
-          ? "Developer demo mode is active. Switch to OpenSky evaluation mode for the real-data product path."
+          ? "Developer fallback mode is active. OpenSky evaluation remains the primary real-data path for the product."
           : serviceStatus.aviation_provider_message ??
             "Live provider data is currently unavailable, so the app is using its internal fallback feed."
         : serviceStatus?.aviation_provider_degraded
           ? serviceStatus.aviation_provider_message ??
             "The configured aviation provider degraded and the app is using a safe fallback path."
         : serviceStatus?.aviation_provider === "opensky" && !serviceStatus.opensky_configured
-          ? "OpenSky evaluation is running anonymously. Add both OpenSky credentials when you are ready to test a real handoff."
+          ? "OpenSky evaluation is running anonymously. Coverage can be partial or delayed until dedicated credentials are added."
         : serviceStatus?.aviation_provider === "commercial_stub"
           ? "Commercial mode is only a readiness placeholder until a real licensed provider is chosen and configured."
         : !serviceStatus?.gemini_enabled
-          ? "Camera vision is currently optional and not configured. Aircraft, alerts, and history remain available."
-          : "Live tracking is healthy. Review history, alerts, and incidents from the side panels.";
+          ? "Aircraft tracking is live. Camera vision remains optional and is not required for the aviation-first workflow."
+          : "Live tracking is healthy. Coverage may still vary by provider visibility and update cadence.";
 
   return (
     <div className="status-panel" role="status" aria-live="polite">

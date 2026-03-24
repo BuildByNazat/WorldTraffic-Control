@@ -2007,6 +2007,9 @@ a:focus-visible {
 .watchlist-item__header{display:flex;align-items:flex-start;gap:8px}
 .watchlist-item__main{flex:1;display:flex;flex-direction:column;gap:3px;border:none;background:transparent;color:inherit;text-align:left;cursor:pointer}
 .watchlist-item__title{font-size:.76rem;font-weight:700;color:var(--text)}
+.watchlist-item__visibility{display:inline-flex;align-items:center;gap:6px;width:max-content;padding:2px 8px;border-radius:999px;border:1px solid var(--border);font-size:.63rem;text-transform:uppercase;letter-spacing:.05em}
+.watchlist-item__visibility--visible{color:var(--success);border-color:rgba(52,211,153,.25);background:rgba(52,211,153,.08)}
+.watchlist-item__visibility--hidden{color:var(--text-muted);background:var(--surface-soft)}
 .watchlist-item__alerts{display:flex;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid var(--border)}
 .watchlist-item__alerts-header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .watchlist-item__alerts-title,.event-detail__alert-title{font-size:.66rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
@@ -2027,3 +2030,7 @@ a:focus-visible {
 .event-detail__alert-header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .event-detail__alert-row{display:flex;flex-direction:column;gap:6px;padding:8px 0;border-top:1px solid var(--border)}
 .event-detail__alert-row:first-of-type{border-top:none}
+
+@media (max-width:768px){
+  .watchlist-item__alert-row{grid-template-columns:1fr;align-items:flex-start}
+}

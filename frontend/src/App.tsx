@@ -91,6 +91,7 @@ function buildAircraftSelectionFromFeature(feature: AircraftFeature): SelectedAi
     freshnessSeconds: feature.properties.freshness_seconds ?? null,
     stale: feature.properties.stale ?? false,
     currentlyVisible: true,
+    hasKnownPosition: true,
     availabilityNote: null,
     watchlistSavedAt: null,
   };
@@ -120,6 +121,7 @@ function buildAircraftSelectionFromSearchResult(
     freshnessSeconds: result.freshness_seconds,
     stale: result.stale,
     currentlyVisible: true,
+    hasKnownPosition: true,
     availabilityNote: null,
     watchlistSavedAt: null,
   };
@@ -157,7 +159,11 @@ function buildAircraftSelectionFromWatchlistItem(
     freshnessSeconds: null,
     stale: false,
     currentlyVisible: false,
-    availabilityNote: "Not currently visible in the active provider snapshot",
+    hasKnownPosition: item.latitude != null && item.longitude != null,
+    availabilityNote:
+      item.latitude != null && item.longitude != null
+        ? "Not currently visible in the active provider snapshot. Showing the last known position."
+        : "Not currently visible in the active provider snapshot, and the provider did not supply a reusable last known position.",
     watchlistSavedAt: item.created_at,
   };
 }
@@ -246,6 +252,16 @@ const App: React.FC = () => {
     );
   }, [aircraftAlertsState.items]);
 
+  const visibleAircraftIds = useMemo(
+    () =>
+      new Set(
+        (data?.features ?? [])
+          .filter(isAircraftFeature)
+          .map((feature) => feature.properties.id)
+      ),
+    [data]
+  );
+
   useEffect(() => {
     if (mode === "history") {
       setHistoryOpen(true);
@@ -258,6 +274,8 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!authState.isAuthenticated) {
       setActiveDrawer((current) => (current === "watchlist" ? null : current));
+      setAccountOpen(false);
+      setAuthPassword("");
     }
   }, [authState.isAuthenticated]);
 
@@ -478,6 +496,7 @@ const App: React.FC = () => {
       setAccountOpen(false);
       setAuthPassword("");
       setWatchlistFeedback(null);
+      setAircraftAlertsFeedback(null);
     }
   }
 
@@ -699,7 +718,7 @@ const App: React.FC = () => {
                   !aircraftSearch.error &&
                   aircraftSearch.results.length === 0 && (
                     <div className="app-flight-search__state">
-                      No active aircraft matched the current query.
+                      No active aircraft matched the current query. Live provider coverage can be sparse or delayed.
                     </div>
                   )}
                 {!aircraftSearch.loading &&
@@ -823,6 +842,7 @@ const App: React.FC = () => {
                   alertsSaving={aircraftAlertsState.saving}
                   alertsError={aircraftAlertsFeedback}
                   alertsByAircraftId={aircraftAlertsByAircraftId}
+                  visibleAircraftIds={visibleAircraftIds}
                   selectedAircraftId={
                     selectedEvent?.kind === "aircraft" ? selectedEvent.id : null
                   }

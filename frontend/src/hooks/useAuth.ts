@@ -53,6 +53,7 @@ export function useAuth() {
     async function loadSession() {
       if (!token) {
         setUser(null);
+        setError(null);
         setLoading(false);
         return;
       }
@@ -146,6 +147,7 @@ export function useAuth() {
       setStoredToken(null);
       setToken(null);
       setUser(null);
+      setError(null);
       setSubmitting(false);
     }
   }, [token]);

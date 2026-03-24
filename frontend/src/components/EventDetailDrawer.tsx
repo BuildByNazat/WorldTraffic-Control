@@ -191,8 +191,14 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
             />
             <DetailRow label="Observed" value={formatTime(selectedEvent.timestamp)} />
             <DetailRow
-              label="Position"
-              value={`${formatCoordinate(selectedEvent.latitude)}, ${formatCoordinate(selectedEvent.longitude)}`}
+              label={
+                selectedEvent.currentlyVisible === false ? "Last known position" : "Position"
+              }
+              value={
+                selectedEvent.hasKnownPosition === false
+                  ? "Position unavailable from the current provider snapshot"
+                  : `${formatCoordinate(selectedEvent.latitude)}, ${formatCoordinate(selectedEvent.longitude)}`
+              }
             />
             <DetailRow
               label="Altitude"
@@ -250,6 +256,12 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
               }
             />
             <DetailRow label="Aircraft ID" value={selectedEvent.id} />
+            {selectedEvent.watchlistSavedAt && (
+              <DetailRow
+                label="Saved"
+                value={formatTime(selectedEvent.watchlistSavedAt)}
+              />
+            )}
             {watchlistMessage && (
               <div className="event-detail__note">{watchlistMessage}</div>
             )}

@@ -16,6 +16,7 @@ interface WatchlistPanelProps {
   alertsSaving: boolean;
   alertsError: string | null;
   alertsByAircraftId: Record<string, AircraftAlertRule[]>;
+  visibleAircraftIds: Set<string>;
   selectedAircraftId: string | null;
   onSelectItem: (item: WatchlistItem) => void;
   onRemoveItem: (aircraftId: string) => void;
@@ -54,6 +55,7 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
   alertsSaving,
   alertsError,
   alertsByAircraftId,
+  visibleAircraftIds,
   selectedAircraftId,
   onSelectItem,
   onRemoveItem,
@@ -112,6 +114,7 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
                 (alert) => alert.alert_type === "not_visible"
               );
               const hasMovementAlert = alerts.some((alert) => alert.alert_type === "movement");
+              const currentlyVisible = visibleAircraftIds.has(item.aircraft_id);
 
               return (
                 <article
@@ -134,6 +137,17 @@ const WatchlistPanel: React.FC<WatchlistPanelProps> = ({
                       </span>
                       <span className="watchlist-item__meta">
                         Last seen {formatObservedAt(item.observed_at)}
+                      </span>
+                      <span
+                        className={`watchlist-item__visibility${
+                          currentlyVisible
+                            ? " watchlist-item__visibility--visible"
+                            : " watchlist-item__visibility--hidden"
+                        }`}
+                      >
+                        {currentlyVisible
+                          ? "Currently visible"
+                          : "Not currently visible"}
                       </span>
                     </button>
                     <button

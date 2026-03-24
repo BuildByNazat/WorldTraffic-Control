@@ -44,6 +44,7 @@ export interface SelectedAircraftDetail extends SelectedEventBase {
   freshnessSeconds?: number | null;
   stale?: boolean;
   currentlyVisible?: boolean;
+  hasKnownPosition?: boolean;
   availabilityNote?: string | null;
   watchlistSavedAt?: string | null;
 }
