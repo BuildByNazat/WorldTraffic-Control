@@ -66,8 +66,10 @@ class OpenSkyProvider(BaseAircraftProvider):
                 )
 
             flights: List[AviationFlight] = []
+            candidate_flights: List[AviationFlight] = []
             skipped_without_position = 0
             skipped_very_stale = 0
+            skipped_without_identity = 0
 
             for s in states:
                 if s[5] is None or s[6] is None:
@@ -95,6 +97,9 @@ class OpenSkyProvider(BaseAircraftProvider):
 
                 callsign = (s[1] or "").strip() or None
                 stable_id = (s[0] or "").strip().upper()
+                if not stable_id:
+                    skipped_without_identity += 1
+                    continue
                 altitude_value_m = s[13] if s[13] is not None else s[7]
                 altitude_ft = (
                     altitude_value_m * 3.28084 if altitude_value_m is not None else None
@@ -102,7 +107,7 @@ class OpenSkyProvider(BaseAircraftProvider):
                 speed_kts = (s[9] * 1.94384) if s[9] is not None else None
                 heading = s[10] if s[10] is not None else None
 
-                flights.append(
+                candidate_flights.append(
                     AviationFlight(
                         stable_id=stable_id,
                         callsign=callsign,
@@ -118,19 +123,47 @@ class OpenSkyProvider(BaseAircraftProvider):
                         stale=freshness_seconds > self.STALE_AFTER_SECONDS,
                     )
                 )
-                if len(flights) >= self.MAX_TRACKED_FLIGHTS:
-                    break
+
+            candidate_flights.sort(
+                key=lambda flight: (
+                    flight.stale,
+                    flight.freshness_seconds
+                    if flight.freshness_seconds is not None
+                    else float("inf"),
+                    flight.callsign is None,
+                    flight.stable_id,
+                )
+            )
+            flights = candidate_flights[: self.MAX_TRACKED_FLIGHTS]
+            skipped_after_cap = max(0, len(candidate_flights) - len(flights))
+            included_stale = sum(1 for flight in flights if flight.stale)
+            missing_callsigns = sum(1 for flight in flights if not flight.callsign)
 
             message = (
                 "Using authenticated OpenSky evaluation access."
                 if self.auth
                 else "Using anonymous OpenSky evaluation access."
             )
-            if skipped_without_position or skipped_very_stale:
+            message = (
+                f"{message} Showing the {len(flights)} freshest aircraft for the current map snapshot."
+            )
+            if (
+                skipped_without_position
+                or skipped_very_stale
+                or skipped_without_identity
+                or skipped_after_cap
+                or included_stale
+                or missing_callsigns
+            ):
                 message = (
-                    f"{message} Filtered {skipped_without_position} aircraft without "
-                    f"position and {skipped_very_stale} very stale tracks."
+                    f"{message} Filtered {skipped_without_position} without position, "
+                    f"{skipped_without_identity} without identity, "
+                    f"{skipped_very_stale} very stale tracks, and held back {skipped_after_cap} additional aircraft to keep the live map responsive."
                 )
+                if included_stale:
+                    message = f"{message} {included_stale} retained tracks are marked stale."
+                if missing_callsigns:
+                    message = f"{message} {missing_callsigns} retained tracks have no callsign from the provider."
 
             return AviationSnapshot(
                 flights=flights,

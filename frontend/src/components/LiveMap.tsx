@@ -87,6 +87,16 @@ function buildAircraftPopup(feature: AnyFeature): string {
   const observed = properties.observed_at
     ? new Date(properties.observed_at).toLocaleTimeString()
     : "Provider timestamp unavailable";
+  const routeFallback =
+    properties.provider_name?.toLowerCase().includes("opensky")
+      ? "Not included in current OpenSky evaluation"
+      : "Unavailable";
+  const freshness =
+    properties.freshness_seconds == null
+      ? "Provider freshness unavailable"
+      : properties.stale
+        ? `${Math.round(properties.freshness_seconds)} sec old (stale)`
+        : `${Math.round(properties.freshness_seconds)} sec old`;
   return `
     <div class="aircraft-popup">
       <h3>${properties.callsign ?? properties.flight_identifier ?? properties.id}</h3>
@@ -97,8 +107,9 @@ function buildAircraftPopup(feature: AnyFeature): string {
         <tr><td>Heading</td><td>${properties.heading} deg</td></tr>
         <tr><td>Speed</td><td>${properties.speed} kt</td></tr>
         <tr><td>Observed</td><td>${observed}</td></tr>
+        <tr><td>Freshness</td><td>${freshness}</td></tr>
         <tr><td>Provider</td><td>${properties.provider_name ?? properties.source}</td></tr>
-        <tr><td>Route</td><td>${properties.route_origin ?? "Unavailable"} - ${properties.route_destination ?? "Unavailable"}</td></tr>
+        <tr><td>Route</td><td>${properties.route_origin ?? routeFallback} - ${properties.route_destination ?? routeFallback}</td></tr>
       </table>
     </div>
   `;

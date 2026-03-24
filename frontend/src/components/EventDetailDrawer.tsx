@@ -53,6 +53,13 @@ function formatFreshness(value: number | null | undefined): string {
   return `${(minutes / 60).toFixed(1)} hr old`;
 }
 
+function formatRouteFallback(providerName?: string | null): string {
+  if (providerName?.toLowerCase().includes("opensky")) {
+    return "Route data is not provided in the current OpenSky evaluation feed";
+  }
+  return "Route unavailable from the current provider";
+}
+
 function DetailRow({
   label,
   value,
@@ -246,13 +253,16 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
             />
             <DetailRow
               label="Origin"
-              value={selectedEvent.routeOrigin ?? "Route unavailable from current provider"}
+              value={
+                selectedEvent.routeOrigin ??
+                formatRouteFallback(selectedEvent.providerName)
+              }
             />
             <DetailRow
               label="Destination"
               value={
                 selectedEvent.routeDestination ??
-                "Route unavailable from current provider"
+                formatRouteFallback(selectedEvent.providerName)
               }
             />
             <DetailRow label="Aircraft ID" value={selectedEvent.id} />

@@ -770,7 +770,11 @@ const App: React.FC = () => {
                       </span>
                       <span className="app-flight-search__result-meta">
                         {result.id} / {result.provider_name ?? result.source}
-                        {result.stale ? " / stale" : ""}
+                        {result.stale
+                          ? ` / ${Math.round(result.freshness_seconds ?? 0)} sec old`
+                          : result.freshness_seconds != null
+                            ? ` / ${Math.round(result.freshness_seconds)} sec old`
+                            : ""}
                       </span>
                     </button>
                   ))}
