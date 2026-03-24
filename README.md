@@ -231,6 +231,7 @@ Recommended production pattern:
   - Use `AVIATION_PROVIDER=opensky`
   - Intended for real-provider testing and credential handoff
   - Works anonymously or with real OpenSky credentials
+  - Filters obviously stale tracks while keeping simulated fallback available if OpenSky fails
 - `commercial`
   - Use `AVIATION_PROVIDER=commercial_stub`
   - Keeps the integration boundary ready for a licensed provider without pretending one is finalized

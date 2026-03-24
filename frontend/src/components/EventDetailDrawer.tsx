@@ -30,6 +30,14 @@ function formatCoordinate(value: number): string {
   return value.toFixed(5);
 }
 
+function formatFreshness(value: number | null | undefined): string {
+  if (value == null) return "Freshness unavailable from current provider";
+  if (value < 60) return `${Math.round(value)} sec old`;
+  const minutes = value / 60;
+  if (minutes < 60) return `${minutes.toFixed(1)} min old`;
+  return `${(minutes / 60).toFixed(1)} hr old`;
+}
+
 function DetailRow({
   label,
   value,
@@ -177,6 +185,14 @@ const EventDetailDrawer: React.FC<EventDetailDrawerProps> = ({
             <DetailRow
               label="Provider"
               value={selectedEvent.providerName ?? selectedEvent.source}
+            />
+            <DetailRow
+              label="Freshness"
+              value={
+                selectedEvent.stale
+                  ? `${formatFreshness(selectedEvent.freshnessSeconds)} (stale)`
+                  : formatFreshness(selectedEvent.freshnessSeconds)
+              }
             />
             <DetailRow
               label="Origin"

@@ -451,6 +451,7 @@ const App: React.FC = () => {
                       </span>
                       <span className="app-flight-search__result-meta">
                         {result.id} / {result.provider_name ?? result.source}
+                        {result.stale ? " / stale" : ""}
                       </span>
                     </button>
                   ))}

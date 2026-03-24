@@ -43,6 +43,18 @@ function formatTime(date: Date): string {
   });
 }
 
+function formatProviderTimestamp(value: string | null | undefined): string {
+  if (!value) return "Awaiting provider snapshot";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Awaiting provider snapshot";
+  return date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
+
 const StatusPanel: React.FC<StatusPanelProps> = ({
   status,
   aircraftCount,
@@ -154,6 +166,13 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
       <div className="status-panel__row">
         <span className="status-panel__label">Health</span>
         <span className="status-panel__value">{providerHealthLabel}</span>
+      </div>
+
+      <div className="status-panel__row">
+        <span className="status-panel__label">Provider snapshot</span>
+        <span className="status-panel__value">
+          {formatProviderTimestamp(serviceStatus?.aviation_last_snapshot_at)}
+        </span>
       </div>
 
       <div className="status-panel__row">
